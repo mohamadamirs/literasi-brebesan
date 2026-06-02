@@ -1,5 +1,6 @@
 // src/lib/jwt.ts
 import { SignJWT } from "jose";
+import { v4 as uuidv4 } from "uuid";
 
 export const authSecret = import.meta.env.AUTH_SECRET || process.env.AUTH_SECRET;
 export const SECRET = new TextEncoder().encode(
@@ -15,6 +16,10 @@ export async function createSessionToken(payload: {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("24h")
+    .setExpirationTime("2h")
     .sign(SECRET);
+}
+
+export function generateRefreshToken() {
+  return uuidv4();
 }

@@ -1,18 +1,27 @@
 import type { APIRoute } from "astro";
+import { sql } from "../lib/db";
 
-export const POST: APIRoute = ({ cookies, redirect }) => {
-  // 1. Hapus cookie session
-  // Pastikan path-nya "/" biar beneran ilang dari semua folder
-  cookies.delete("session", {
-    path: "/",
-  });
+export const POST: APIRoute = async ({ cookies, redirect }) => {
+  const refreshToken = cookies.get("refresh_token")?.value;
 
-  // 2. Redirect ke login dengan pesan sukses (optional)
+  // 1. Hapus session dari Database jika ada
+  if (refreshToken) {
+    try {
+      await sql`DELETE FROM user_sessions WHERE refresh_token = ${refreshToken}`;
+    } catch (e) {
+      console.error("Logout DB Error:", e);
+    }
+  }
+
+  // 2. Hapus semua cookie auth
+  cookies.delete("access_token", { path: "/" });
+  cookies.delete("refresh_token", { path: "/" });
+  cookies.delete("session", { path: "/" }); // Migrasi dari session lama
+
+  // 3. Redirect ke login
   return redirect("/login?message=Anda telah berhasil keluar dari sistem.");
 };
 
-// Kalau ada yang iseng akses lewat browser langsung (GET),
-// kita tendang juga ke login atau dashboard.
 export const GET: APIRoute = ({ redirect }) => {
   return redirect("/dashboard");
 };
