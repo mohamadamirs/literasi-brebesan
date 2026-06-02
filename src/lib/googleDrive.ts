@@ -1,4 +1,5 @@
 import * as jose from "jose";
+import { sql } from "./db";
 
 const googleEmail = import.meta.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const googleKey = import.meta.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
@@ -16,14 +17,43 @@ export interface DriveItem {
   webContentLink?: string;
 }
 
-// --- TOKEN CACHE ---
-let cachedAccessToken: string | null = null;
-let tokenExpiry = 0;
+// --- PERSISTENT CACHE (DATABASE) ---
+async function getCachedData<T>(key: string): Promise<T | null> {
+  try {
+    const { rows } = await sql`
+      SELECT value FROM drive_cache 
+      WHERE key = ${key} AND expires_at > NOW()
+      LIMIT 1
+    `;
+    if (rows[0]) {
+      console.log(`[DRIVE CACHE] Hit: ${key}`);
+      return rows[0].value as T;
+    }
+    return null;
+  } catch (e) {
+    console.error("Cache Read Error:", e);
+    return null;
+  }
+}
+
+async function setCachedData(key: string, data: any, ttlSeconds: number = 3600): Promise<void> {
+  try {
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    await sql`
+      INSERT INTO drive_cache (key, value, expires_at)
+      VALUES (${key}, ${JSON.stringify(data)}, ${expiresAt})
+      ON CONFLICT (key) DO UPDATE 
+      SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at
+    `;
+  } catch (e) {
+    console.error("Cache Write Error:", e);
+  }
+}
 
 async function getAccessToken(): Promise<string> {
-  if (cachedAccessToken && Date.now() < tokenExpiry) {
-    return cachedAccessToken;
-  }
+  const cacheKey = "google_access_token";
+  const cached = await getCachedData<string>(cacheKey);
+  if (cached) return cached;
 
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 3600;
@@ -55,31 +85,15 @@ async function getAccessToken(): Promise<string> {
     throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
   }
 
-  cachedAccessToken = data.access_token;
-  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000; // Buffer 1 menit
-  return cachedAccessToken!;
-}
-
-// --- MEKANISME CACHE SEDERHANA ---
-const CACHE = new Map<string, { data: any; expiry: number }>();
-const CACHE_TTL = 1000 * 60 * 60; // 1 Jam
-
-function getCachedData(key: string) {
-  const cached = CACHE.get(key);
-  if (cached && cached.expiry > Date.now()) {
-    console.log(`[DRIVE CACHE] Hit: ${key}`);
-    return cached.data;
-  }
-  return null;
-}
-
-function setCachedData(key: string, data: any) {
-  CACHE.set(key, { data, expiry: Date.now() + CACHE_TTL });
+  const token = data.access_token;
+  // Cache token dengan sedikit buffer (minus 60 detik)
+  await setCachedData(cacheKey, token, data.expires_in - 60);
+  return token;
 }
 
 export async function getFolders(parentId: string): Promise<DriveItem[]> {
   const cacheKey = `folders_${parentId}`;
-  const cached = getCachedData(cacheKey);
+  const cached = await getCachedData<DriveItem[]>(cacheKey);
   if (cached) return cached;
 
   const accessToken = await getAccessToken();
@@ -95,7 +109,7 @@ export async function getFolders(parentId: string): Promise<DriveItem[]> {
 
   const data = await res.json();
   const folders = (data.files as DriveItem[]) || [];
-  setCachedData(cacheKey, folders);
+  await setCachedData(cacheKey, folders);
   return folders;
 }
 
@@ -105,7 +119,7 @@ export async function getMediaFiles(
   limit: number = 4,
 ): Promise<{ files: DriveItem[]; nextPageToken: string | null }> {
   const cacheKey = `media_${folderId}_${pageToken || 'first'}_${limit}`;
-  const cached = getCachedData(cacheKey);
+  const cached = await getCachedData<{ files: DriveItem[]; nextPageToken: string | null }>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -127,7 +141,7 @@ export async function getMediaFiles(
       nextPageToken: data.nextPageToken || null,
     };
     
-    setCachedData(cacheKey, result);
+    await setCachedData(cacheKey, result);
     return result;
   } catch (error) {
     console.error("Error fetching media files:", error);
@@ -140,7 +154,7 @@ export async function getMediaFiles(
  */
 export async function getLatestMedia(limit: number = 4): Promise<DriveItem[]> {
   const cacheKey = `latest_media_${limit}`;
-  const cached = getCachedData(cacheKey);
+  const cached = await getCachedData<DriveItem[]>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -158,7 +172,7 @@ export async function getLatestMedia(limit: number = 4): Promise<DriveItem[]> {
 
     const data = await res.json();
     const files = (data.files as DriveItem[]) || [];
-    setCachedData(cacheKey, files);
+    await setCachedData(cacheKey, files);
     return files;
   } catch (error) {
     console.error("Error fetching latest media:", error);
