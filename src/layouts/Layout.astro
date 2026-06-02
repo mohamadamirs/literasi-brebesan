@@ -22,7 +22,9 @@ const {
 } = Astro.props;
 
 const siteUrl = "https://literasibrebesan.my.id";
-const canonicalURL = siteUrl + Astro.url.pathname;
+// Menghapus trailing slash untuk konsistensi dengan sitemap
+const cleanPath = Astro.url.pathname.replace(/\/$/, "");
+const canonicalURL = siteUrl + (cleanPath || "/");
 const formattedTitle = title.includes('Literasi Brebesan') ? title : `${title} - Literasi Brebesan`;
 
 // URL Gambar Sosial (Absolute)
