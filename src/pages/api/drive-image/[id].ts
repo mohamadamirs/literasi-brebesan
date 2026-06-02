@@ -16,12 +16,10 @@ export const GET: APIRoute = async ({ params, url }) => {
       return new Response(null, { status: response.status });
     }
 
-    const buffer = await response.arrayBuffer();
-    const contentType = response.headers.get("Content-Type") || "image/jpeg";
-
-    return new Response(buffer, {
+    // Menggunakan response.body (Streaming) untuk efisiensi memori
+    return new Response(response.body, {
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": response.headers.get("Content-Type") || "image/jpeg",
         // Cache gambar di Edge Network dan Browser selama 1 tahun (31536000 detik)
         "Cache-Control": "public, max-age=31536000, s-maxage=31536000, immutable",
       }

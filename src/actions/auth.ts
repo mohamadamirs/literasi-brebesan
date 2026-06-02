@@ -3,7 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { sql } from "../lib/db";
 import { v4 as uuidv4 } from "uuid";
-import { createSessionToken } from "../lib/jwt";
+import { createSessionToken, generateRefreshToken } from "../lib/jwt";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 
@@ -41,19 +41,40 @@ export const authActions = {
           });
         }
 
-        const token = await createSessionToken({
+        const accessToken = await createSessionToken({
           userId: user.id,
           role: user.role || "user",
           fullName: user.full_name || "User",
           avatarUrl: user.avatar_url
         });
-        context.cookies.set("session", token, {
+
+        const refreshToken = generateRefreshToken();
+        const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 hari
+
+        await sql`
+          INSERT INTO user_sessions (user_id, refresh_token, expires_at)
+          VALUES (${user.id}, ${refreshToken}, ${expiresAt})
+        `;
+
+        context.cookies.set("access_token", accessToken, {
           path: "/",
           httpOnly: true,
           secure: import.meta.env.PROD,
           sameSite: "lax",
-          maxAge: 60 * 60 * 24,
+          maxAge: 60 * 60 * 2, // 2 jam
         });
+
+        context.cookies.set("refresh_token", refreshToken, {
+          path: "/",
+          httpOnly: true,
+          secure: import.meta.env.PROD,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 14, // 14 hari
+        });
+
+        // Hapus session lama jika ada (opsional, untuk migrasi)
+        context.cookies.delete("session", { path: "/" });
+
         return { success: true };
       } catch (e: any) {
         if (e instanceof ActionError) throw e;
@@ -91,19 +112,39 @@ export const authActions = {
         await sql`INSERT INTO users (id, email, password_hash) VALUES (${userId}, ${input.email}, ${hashedPassword})`;
         await sql`INSERT INTO profiles (id, full_name, role) VALUES (${userId}, ${input.fullName}, 'user')`;
 
-        const token = await createSessionToken({
+        const accessToken = await createSessionToken({
           userId: userId,
           role: "user",
           fullName: input.fullName,
           avatarUrl: null
         });
-        context.cookies.set("session", token, {
+
+        const refreshToken = generateRefreshToken();
+        const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+        await sql`
+          INSERT INTO user_sessions (user_id, refresh_token, expires_at)
+          VALUES (${userId}, ${refreshToken}, ${expiresAt})
+        `;
+
+        context.cookies.set("access_token", accessToken, {
           path: "/",
           httpOnly: true,
           secure: import.meta.env.PROD,
           sameSite: "lax",
-          maxAge: 60 * 60 * 24,
+          maxAge: 60 * 60 * 2, // 2 jam
         });
+
+        context.cookies.set("refresh_token", refreshToken, {
+          path: "/",
+          httpOnly: true,
+          secure: import.meta.env.PROD,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 14, // 14 hari
+        });
+
+        context.cookies.delete("session", { path: "/" });
+
         return { success: true };
       } catch (e: any) {
         if (e instanceof ActionError) throw e;

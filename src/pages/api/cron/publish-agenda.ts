@@ -9,6 +9,17 @@ import { sql } from '../../../lib/db';
  * agar tidak sembarang orang bisa memicu endpoint ini.
  */
 export const GET: APIRoute = async ({ request }) => {
+  const cronSecret = import.meta.env.CRON_SECRET;
+  const authHeader = request.headers.get('Authorization');
+
+  // Keamanan: Cek CRON_SECRET jika dikonfigurasi di env
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Unauthorized' 
+    }), { status: 401 });
+  }
+
   try {
     // 1. Cari agenda yang statusnya 'scheduled' dan sudah waktunya tayang
     const { rows: readyToPublish } = await sql`

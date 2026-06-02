@@ -1,4 +1,4 @@
-import { google } from "googleapis";
+import * as jose from "jose";
 
 const googleEmail = import.meta.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const googleKey = import.meta.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
@@ -7,13 +7,6 @@ if (!googleEmail || !googleKey) {
   console.error("❌ ERROR: Google Drive environment variables missing!");
 }
 
-const auth = new google.auth.JWT({
-  email: googleEmail,
-  key: googleKey ? googleKey.replace(/\\n/g, "\n") : undefined,
-  scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-});
-
-const drive = google.drive({ version: "v3", auth });
 const ROOT_ID = import.meta.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
 export interface DriveItem {
@@ -21,6 +14,50 @@ export interface DriveItem {
   name: string;
   mimeType?: string;
   webContentLink?: string;
+}
+
+// --- TOKEN CACHE ---
+let cachedAccessToken: string | null = null;
+let tokenExpiry = 0;
+
+async function getAccessToken(): Promise<string> {
+  if (cachedAccessToken && Date.now() < tokenExpiry) {
+    return cachedAccessToken;
+  }
+
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + 3600;
+
+  const key = await jose.importPKCS8(googleKey!.replace(/\\n/g, "\n"), "RS256");
+
+  const jwt = await new jose.SignJWT({
+    iss: googleEmail,
+    sub: googleEmail,
+    scope: "https://www.googleapis.com/auth/drive.readonly",
+    aud: "https://oauth2.googleapis.com/token",
+    exp,
+    iat,
+  })
+    .setProtectedHeader({ alg: "RS256" })
+    .sign(key);
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(`Failed to get Google Access Token: ${JSON.stringify(data)}`);
+  }
+
+  cachedAccessToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000; // Buffer 1 menit
+  return cachedAccessToken!;
 }
 
 // --- MEKANISME CACHE SEDERHANA ---
@@ -45,13 +82,19 @@ export async function getFolders(parentId: string): Promise<DriveItem[]> {
   const cached = getCachedData(cacheKey);
   if (cached) return cached;
 
-  const res = await drive.files.list({
-    q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-    fields: "files(id, name)",
-    orderBy: "name desc",
-  });
+  const accessToken = await getAccessToken();
+  const q = encodeURIComponent(`'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+  const fields = "files(id, name)";
+  const orderBy = "name desc";
   
-  const folders = (res.data.files as DriveItem[]) || [];
+  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&orderBy=${orderBy}`;
+  
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  const data = await res.json();
+  const folders = (data.files as DriveItem[]) || [];
   setCachedData(cacheKey, folders);
   return folders;
 }
@@ -66,16 +109,22 @@ export async function getMediaFiles(
   if (cached) return cached;
 
   try {
-    const response = await drive.files.list({
-      q: `'${folderId}' in parents and trashed = false`,
-      fields: "nextPageToken, files(id, name, mimeType, webContentLink)",
-      pageSize: limit,
-      pageToken: pageToken || undefined,
+    const accessToken = await getAccessToken();
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
+    const fields = "nextPageToken, files(id, name, mimeType, webContentLink)";
+    const pageSize = limit;
+    
+    let url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=${pageSize}`;
+    if (pageToken) url += `&pageToken=${pageToken}`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
+    const data = await res.json();
     const result = {
-      files: (response.data.files as DriveItem[]) || [],
-      nextPageToken: response.data.nextPageToken || null,
+      files: (data.files as DriveItem[]) || [],
+      nextPageToken: data.nextPageToken || null,
     };
     
     setCachedData(cacheKey, result);
@@ -95,15 +144,20 @@ export async function getLatestMedia(limit: number = 4): Promise<DriveItem[]> {
   if (cached) return cached;
 
   try {
-    const res = await drive.files.list({
-      // Mencari semua file gambar yang tidak ada di sampah
-      q: "mimeType contains 'image/' and trashed = false",
-      fields: "files(id, name, webContentLink)",
-      orderBy: "createdTime desc",
-      pageSize: limit,
+    const accessToken = await getAccessToken();
+    const q = encodeURIComponent("mimeType contains 'image/' and trashed = false");
+    const fields = "files(id, name, webContentLink)";
+    const orderBy = "createdTime desc";
+    const pageSize = limit;
+
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&orderBy=${orderBy}&pageSize=${pageSize}`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
-    const files = (res.data.files as DriveItem[]) || [];
+
+    const data = await res.json();
+    const files = (data.files as DriveItem[]) || [];
     setCachedData(cacheKey, files);
     return files;
   } catch (error) {
