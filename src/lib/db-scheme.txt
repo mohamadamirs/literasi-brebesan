@@ -48,6 +48,11 @@ CREATE TABLE "users" (
 	"reset_token" text,
 	"reset_expiry" timestamp
 );
+CREATE TABLE "drive_cache" (
+    "key" text PRIMARY KEY,
+    "value" jsonb NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL
+);
 CREATE UNIQUE INDEX "agendas_pkey" ON "agendas" ("id");
 CREATE UNIQUE INDEX "categories_pkey" ON "categories" ("id");
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories" ("slug");
