@@ -6,12 +6,10 @@ export const GET: APIRoute = async () => {
   const today = new Date().toISOString().split('T')[0];
 
   try {
-    // 1. Fetch data from DB
     const { rows: posts } = await sql`SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY updated_at DESC`;
     const { rows: profiles } = await sql`SELECT id, created_at FROM profiles ORDER BY created_at DESC`;
     const { rows: latestAgenda } = await sql`SELECT created_at FROM agendas WHERE status = 'published' ORDER BY created_at DESC LIMIT 1`;
 
-    // Calculate dynamic lastmod for Home
     let homeLastMod = today;
     if (posts.length > 0) {
       const latestPostDate = new Date(posts[0].updated_at).toISOString().split('T')[0];
@@ -22,7 +20,6 @@ export const GET: APIRoute = async () => {
       if (agendaDate > homeLastMod) homeLastMod = agendaDate;
     }
 
-    // Helper to escape XML characters
     const escapeXml = (unsafe: string) => {
       return unsafe.replace(/[<>&'"]/g, (c) => {
         switch (c) {
@@ -36,36 +33,24 @@ export const GET: APIRoute = async () => {
       });
     };
 
-    // Construct XML array to avoid string concatenation issues and hidden characters
     const urls: string[] = [];
-
-    // Static Pages
     urls.push(`<url><loc>${baseUrl}/</loc><lastmod>${homeLastMod}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`);
     urls.push(`<url><loc>${baseUrl}/publikasi</loc><lastmod>${homeLastMod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`);
     urls.push(`<url><loc>${baseUrl}/dokumentasi</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`);
     urls.push(`<url><loc>${baseUrl}/kontak</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`);
 
-    // Dynamic Posts
     posts.forEach(post => {
       const date = new Date(post.updated_at).toISOString().split('T')[0];
       urls.push(`<url><loc>${baseUrl}/publikasi/${escapeXml(post.slug)}</loc><lastmod>${date}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`);
     });
 
-    // Dynamic Profiles
     profiles.forEach(profile => {
       const date = new Date(profile.created_at || today).toISOString().split('T')[0];
       urls.push(`<url><loc>${baseUrl}/p/${profile.id}</loc><lastmod>${date}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
     });
 
-    // Join everything into final XML string
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
-        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
-${urls.join('\n')}
-</urlset>`.trim();
+    // ULTRA-COMPATIBILITY: No spaces, no extra namespaces, single line.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`;
 
     return new Response(xml, {
       status: 200,
@@ -77,10 +62,7 @@ ${urls.join('\n')}
     });
   } catch (error) {
     console.error('Sitemap Error:', error);
-    const emergencyXml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url><loc>${baseUrl}/</loc><lastmod>${today}</lastmod></url>
-</urlset>`.trim();
+    const emergencyXml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrl}/</loc><lastmod>${today}</lastmod></url></urlset>`;
     return new Response(emergencyXml, { 
       status: 200, 
       headers: { 'Content-Type': 'application/xml; charset=utf-8' } 
