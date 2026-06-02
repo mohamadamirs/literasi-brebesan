@@ -34,38 +34,45 @@ export const GET: APIRoute = async () => {
     };
 
     const urls: string[] = [];
-    urls.push(`<url><loc>${baseUrl}/</loc><lastmod>${homeLastMod}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`);
-    urls.push(`<url><loc>${baseUrl}/publikasi</loc><lastmod>${homeLastMod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`);
-    urls.push(`<url><loc>${baseUrl}/dokumentasi</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`);
-    urls.push(`<url><loc>${baseUrl}/kontak</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`);
+    // Format minimalis: loc dan lastmod saja
+    urls.push(`<url><loc>${baseUrl}/</loc><lastmod>${homeLastMod}</lastmod></url>`);
+    urls.push(`<url><loc>${baseUrl}/publikasi</loc><lastmod>${homeLastMod}</lastmod></url>`);
+    urls.push(`<url><loc>${baseUrl}/dokumentasi</loc><lastmod>${today}</lastmod></url>`);
+    urls.push(`<url><loc>${baseUrl}/kontak</loc><lastmod>${today}</lastmod></url>`);
 
     posts.forEach(post => {
       const date = new Date(post.updated_at).toISOString().split('T')[0];
-      urls.push(`<url><loc>${baseUrl}/publikasi/${escapeXml(post.slug)}</loc><lastmod>${date}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`);
+      urls.push(`<url><loc>${baseUrl}/publikasi/${escapeXml(post.slug)}</loc><lastmod>${date}</lastmod></url>`);
     });
 
     profiles.forEach(profile => {
       const date = new Date(profile.created_at || today).toISOString().split('T')[0];
-      urls.push(`<url><loc>${baseUrl}/p/${profile.id}</loc><lastmod>${date}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
+      urls.push(`<url><loc>${baseUrl}/p/${profile.id}</loc><lastmod>${date}</lastmod></url>`);
     });
 
-    // ULTRA-COMPATIBILITY: No spaces, no extra namespaces, single line.
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`;
+    // Format Sempurna: XML Declaration + Baris Baru + URLSet
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>`.trim();
 
     return new Response(xml, {
       status: 200,
       headers: {
-        'Content-Type': 'application/xml; charset=utf-8',
+        'Content-Type': 'text/xml; charset=utf-8',
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
         'X-Content-Type-Options': 'nosniff'
       }
     });
   } catch (error) {
     console.error('Sitemap Error:', error);
-    const emergencyXml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrl}/</loc><lastmod>${today}</lastmod></url></urlset>`;
+    const emergencyXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>${baseUrl}/</loc><lastmod>${today}</lastmod></url>
+</urlset>`.trim();
     return new Response(emergencyXml, { 
       status: 200, 
-      headers: { 'Content-Type': 'application/xml; charset=utf-8' } 
+      headers: { 'Content-Type': 'text/xml; charset=utf-8' } 
     });
   }
 };
