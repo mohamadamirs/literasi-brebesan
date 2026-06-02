@@ -1,0 +1,8 @@
+MASALAH: Kebocoran Logika Data di Komponen UI
+FILE: src/components/main/AgendaIsland.tsx
+
+DESKRIPSI:
+Komponen UI `AgendaIsland` mengandung logika fallback data (hardcoded) dan logika pemformatan tanggal yang cukup kompleks. Seharusnya komponen UI hanya bertugas menampilkan data yang sudah "bersih" dari layer di bawahnya.
+
+REKOMENDASI:
+Pindahkan logika transformasi data dan fallback ke dalam utilitas server-side atau pastikan data sudah diformat dengan benar sebelum dikirim ke komponen client-side.

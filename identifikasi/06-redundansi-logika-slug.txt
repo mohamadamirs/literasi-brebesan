@@ -1,0 +1,8 @@
+MASALAH: Redundansi Logika Pembuatan Slug
+FILE: src/actions/categories.ts, src/actions/posts.ts
+
+DESKRIPSI:
+Logika untuk mengubah judul menjadi slug (URL friendly) ditulis berulang kali di berbagai fungsi action. Hal ini menyulitkan pemeliharaan jika format slug ingin diubah di masa depan.
+
+REKOMENDASI:
+Pindahkan logika pembuatan slug ke fungsi utilitas terpusat di `src/lib/utils.ts`.

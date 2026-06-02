@@ -1,0 +1,8 @@
+MASALAH: Penggunaan Tipe 'any' yang Berlebihan (Loss of Type Safety)
+FILE: Berbagai file (.ts, .tsx)
+
+DESKRIPSI:
+Terdapat banyak penggunaan tipe `any` terutama pada blok `catch` error, data dari database, dan props komponen. Hal ini menghilangkan manfaat utama dari TypeScript dan membiarkan potensi error runtime tidak terdeteksi saat kompilasi.
+
+REKOMENDASI:
+Definisikan interface/type yang jelas untuk semua data database dan gunakan `unknown` pada blok catch yang diikuti dengan type guard/validation (misal menggunakan Zod).

@@ -14,7 +14,7 @@ export const agendaActions = {
       event_time: z.string(),
       location: z.string(),
       wa_link: z.string().url(),
-      status: z.enum(['draft', 'published', 'scheduled']),
+      status: z.enum(['draft', 'published', 'scheduled', 'archived']),
       publish_at: z.string().optional().nullable(),
       poster: z.instanceof(File).optional(),
       // TAMBAHAN: Menangkap nilai checkbox
@@ -45,9 +45,9 @@ export const agendaActions = {
           // Kalau admin centang override, jadikan agenda lama draft!
           if (input.override_published) {
             try {
-              await sql`UPDATE agendas SET status = 'draft' WHERE id = ${existing[0].id}`;
+              await sql`UPDATE agendas SET status = 'archived' WHERE id = ${existing[0].id}`;
             } catch (e) {
-              throw new ActionError({ code: 'INTERNAL_SERVER_ERROR', message: 'Gagal mengubah status agenda lama menjadi draf.' });
+              throw new ActionError({ code: 'INTERNAL_SERVER_ERROR', message: 'Gagal mengubah status agenda lama menjadi arsip.' });
             }
           } else {
             // Kalau tidak dicentang tapi tetap ingin mempublikasi, tolak.
@@ -153,7 +153,7 @@ export const agendaActions = {
 
       try {
         // 1. Ubah SEMUA yang statusnya published menjadi draft (reset)
-        await sql`UPDATE agendas SET status = 'draft' WHERE status = 'published'`;
+        await sql`UPDATE agendas SET status = 'archived' WHERE status = 'published'`;
         
         // 2. Terbitkan agenda yang dipilih
         await sql`UPDATE agendas SET status = 'published', publish_at = NULL WHERE id = ${id}`;

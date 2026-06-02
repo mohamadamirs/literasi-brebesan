@@ -4,6 +4,7 @@ import { postActions } from "./posts";
 import { agendaActions } from "./agenda";
 import { profileActions } from "./profile";
 import { categoryActions } from "./categories";
+import { contactActions } from "./contact";
 
 export const server = {
   ...authActions,
@@ -11,4 +12,5 @@ export const server = {
   ...agendaActions,
   ...profileActions,
   ...categoryActions,
+  ...contactActions,
 };

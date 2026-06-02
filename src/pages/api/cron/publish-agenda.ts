@@ -2,11 +2,9 @@ import type { APIRoute } from 'astro';
 import { sql } from '../../../lib/db';
 
 /**
- * API ini berfungsi sebagai Cron Job untuk mempublikasikan agenda
- * yang sudah mencapai waktu tayangnya (publish_at).
- * 
- * Keamanan: Idealnya tambahkan pengecekan Header CRON_SECRET 
- * agar tidak sembarang orang bisa memicu endpoint ini.
+ * API ini berfungsi sebagai Cron Job untuk mempublikasikan agenda.
+ * Logika: Hanya 1 agenda yang aktif (published) pada satu waktu.
+ * Jika ada agenda baru yang siap terbit, agenda lama akan otomatis diarsipkan.
  */
 export const GET: APIRoute = async ({ request }) => {
   const cronSecret = import.meta.env.CRON_SECRET;
@@ -21,34 +19,46 @@ export const GET: APIRoute = async ({ request }) => {
   }
 
   try {
-    // 1. Cari agenda yang statusnya 'scheduled' dan sudah waktunya tayang
+    // 1. Cari agenda yang statusnya 'scheduled' dan sudah waktunya tayang.
+    // Kita ambil yang paling baru (publish_at paling besar) untuk diterbitkan.
     const { rows: readyToPublish } = await sql`
-      SELECT id FROM agendas
+      SELECT id, publish_at FROM agendas
       WHERE status = 'scheduled'
         AND publish_at <= CURRENT_TIMESTAMP
-      ORDER BY publish_at ASC
+      ORDER BY publish_at DESC
       LIMIT 1
     `;
 
     if (readyToPublish.length > 0) {
       const newAgendaId = readyToPublish[0].id;
+      const publishAt = readyToPublish[0].publish_at;
 
-      // Jalankan transaksi (urutan penting)
-      // Turunkan yang sedang 'published' jadi 'draft' (atau status lain sesuai logika bisnis Anda)
-      await sql`UPDATE agendas SET status = 'draft' WHERE status = 'published'`;
+      // Jalankan pembaruan status dalam satu rangkaian proses
       
-      // Naikkan yang baru jadi 'published'
-      await sql`UPDATE agendas SET status = 'published', publish_at = NULL WHERE id = ${newAgendaId}`;
+      // A. Ubah semua agenda yang sedang 'published' menjadi 'archived'
+      await sql`UPDATE agendas SET status = 'archived' WHERE status = 'published'`;
+      
+      // B. Ubah agenda 'scheduled' lain yang waktunya sudah lewat (superseded) menjadi 'archived'
+      await sql`
+        UPDATE agendas 
+        SET status = 'archived' 
+        WHERE status = 'scheduled' 
+          AND publish_at <= ${publishAt} 
+          AND id != ${newAgendaId}
+      `;
+      
+      // C. Terbitkan agenda yang paling baru
+      await sql`UPDATE agendas SET status = 'published' WHERE id = ${newAgendaId}`;
 
       return new Response(JSON.stringify({ 
         success: true, 
-        message: `Agenda ${newAgendaId} berhasil dipublikasikan.` 
+        message: `Agenda baru berhasil dipublikasikan, agenda lama diarsipkan.` 
       }), { status: 200 });
     }
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: "Tidak ada agenda yang perlu dipublikasikan saat ini." 
+      message: "Tidak ada agenda baru yang perlu dipublikasikan saat ini." 
     }), { status: 200 });
 
   } catch (error) {

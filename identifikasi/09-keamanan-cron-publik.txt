@@ -1,0 +1,8 @@
+MASALAH: Endpoint Cron Publik Tanpa Proteksi
+FILE: src/pages/api/cron/publish-agenda.ts
+
+DESKRIPSI:
+Endpoint yang digunakan untuk menjalankan tugas otomatis (cron) publikasi agenda dapat diakses oleh siapa saja tanpa memerlukan token rahasia atau otentikasi. Pihak luar bisa memicu proses ini berulang kali secara manual, yang dapat mengganggu logika bisnis atau membebani server.
+
+REKOMENDASI:
+Tambahkan pengecekan Header Authorization (misal: Bearer token rahasia) yang hanya diketahui oleh sistem cron Vercel, atau gunakan variabel lingkungan `CRON_SECRET` untuk memverifikasi request.

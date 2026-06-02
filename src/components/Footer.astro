@@ -1,5 +1,7 @@
 ---
 // src/components/Footer.astro
+import { CONTACT_INFO } from "../lib/constants";
+
 const year = new Date().getFullYear();
 ---
 
@@ -22,10 +24,7 @@ const year = new Date().getFullYear();
         </p>
         <div class="space-y-2 md:space-y-3 text-xs md:text-sm text-slate-500">
           <p class="flex items-center gap-3">
-            <span class="text-blue-500">📍</span> Limbangan Kulon, Brebes, Jawa Tengah
-          </p>
-          <p class="flex items-center gap-3">
-            <span class="text-blue-500">✉️</span> literasibrebesan@gmail.com
+            <span class="text-blue-500">✉️</span> {CONTACT_INFO.email}
           </p>
         </div>
       </div>
@@ -68,7 +67,7 @@ const year = new Date().getFullYear();
 
         <div class="flex items-center gap-3">
           <a
-            href="https://www.instagram.com/literasi_brebesan/"
+            href={CONTACT_INFO.instagram}
             target="_blank"
             class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all group"
             aria-label="Instagram"
@@ -81,7 +80,7 @@ const year = new Date().getFullYear();
           </a>
 
           <a
-            href="https://wa.me/628993986415"
+            href={CONTACT_INFO.whatsapp}
             target="_blank"
             class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all"
             aria-label="WhatsApp"
@@ -92,7 +91,7 @@ const year = new Date().getFullYear();
           </a>
 
           <a
-            href="https://www.facebook.com/share/19FgN2ekpd/"
+            href={CONTACT_INFO.facebook}
             target="_blank"
             class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-blue-800 hover:text-white hover:border-blue-800 transition-all"
             aria-label="Facebook"

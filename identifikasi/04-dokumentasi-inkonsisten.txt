@@ -1,0 +1,8 @@
+MASALAH: Inkonsistensi Dokumentasi Teknis dan Implementasi
+FILE: TECH_DESIGN.md
+
+DESKRIPSI:
+Dokumentasi di TECH_DESIGN.md menyebutkan penggunaan Drizzle ORM sebagai standar akses database. Namun, seluruh implementasi kode saat ini menggunakan Raw SQL melalui library `@vercel/postgres`. Hal ini membingungkan pengembang baru dan menunjukkan kurangnya sinkronisasi antara perencanaan dan eksekusi.
+
+REKOMENDASI:
+Perbarui dokumentasi agar sesuai dengan implementasi saat ini, atau lakukan migrasi ke Drizzle ORM sesuai rencana awal.

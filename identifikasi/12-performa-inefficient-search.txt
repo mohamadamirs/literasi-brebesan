@@ -1,0 +1,8 @@
+MASALAH: Query Pencarian Teks Tidak Efisien
+FILE: src/actions/posts.ts, src/pages/api/posts.ts
+
+DESKRIPSI:
+Penggunaan `ILIKE %pattern%` pada kolom konten artikel yang besar sangat lambat karena database tidak bisa menggunakan index standar (B-Tree). Ini akan menyebabkan penggunaan CPU yang tinggi pada database saat jumlah artikel membengkak.
+
+REKOMENDASI:
+Gunakan fitur Full-Text Search (FTS) bawaan PostgreSQL dengan kolom tipe `tsvector` dan index `GIN`, atau gunakan layanan pencarian eksternal jika skala konten sangat besar.
