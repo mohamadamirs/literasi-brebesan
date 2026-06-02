@@ -6,7 +6,7 @@ export const GET: APIRoute = async () => {
   const today = new Date().toISOString().split('T')[0];
 
   try {
-    // 1. Fetch data
+    // 1. Fetch data from DB
     const { rows: posts } = await sql`SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY updated_at DESC`;
     const { rows: profiles } = await sql`SELECT id, created_at FROM profiles ORDER BY created_at DESC`;
     const { rows: latestAgenda } = await sql`SELECT created_at FROM agendas WHERE status = 'published' ORDER BY created_at DESC LIMIT 1`;
@@ -22,10 +22,7 @@ export const GET: APIRoute = async () => {
       if (agendaDate > homeLastMod) homeLastMod = agendaDate;
     }
 
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-
-    // Helper function (Flattened XML for better parsing)
+    // Helper to escape XML characters
     const escapeXml = (unsafe: string) => {
       return unsafe.replace(/[<>&'"]/g, (c) => {
         switch (c) {
@@ -34,46 +31,55 @@ export const GET: APIRoute = async () => {
           case '&': return '&amp;';
           case '\'': return '&apos;';
           case '"': return '&quot;';
+          default: return c;
         }
-        return c;
       });
     };
 
-    const addUrl = (path: string, lastmod: string, changefreq: string, priority: string) => {
-      xml += `<url><loc>${baseUrl}${escapeXml(path)}</loc><lastmod>${lastmod}</lastmod><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
-    };
+    // Construct XML array to avoid string concatenation issues and hidden characters
+    const urls: string[] = [];
 
-    // 2. Home & Static
-    addUrl('/', homeLastMod, 'daily', '1.0');
-    addUrl('/publikasi', homeLastMod, 'weekly', '0.9');
-    addUrl('/dokumentasi', today, 'weekly', '0.9');
-    addUrl('/register', today, 'monthly', '0.5');
-    addUrl('/login', today, 'monthly', '0.5');
+    // Static Pages
+    urls.push(`<url><loc>${baseUrl}/</loc><lastmod>${homeLastMod}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`);
+    urls.push(`<url><loc>${baseUrl}/publikasi</loc><lastmod>${homeLastMod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`);
+    urls.push(`<url><loc>${baseUrl}/dokumentasi</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`);
+    urls.push(`<url><loc>${baseUrl}/kontak</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`);
 
-    // 3. Dynamic Posts
+    // Dynamic Posts
     posts.forEach(post => {
       const date = new Date(post.updated_at).toISOString().split('T')[0];
-      addUrl(`/publikasi/${post.slug}`, date, 'weekly', '0.9');
+      urls.push(`<url><loc>${baseUrl}/publikasi/${escapeXml(post.slug)}</loc><lastmod>${date}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`);
     });
 
-    // 4. Dynamic Profiles
+    // Dynamic Profiles
     profiles.forEach(profile => {
       const date = new Date(profile.created_at || today).toISOString().split('T')[0];
-      addUrl(`/p/${profile.id}`, date, 'monthly', '0.8');
+      urls.push(`<url><loc>${baseUrl}/p/${profile.id}</loc><lastmod>${date}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
     });
 
-    xml += '</urlset>';
+    // Join everything into final XML string
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>`.trim();
 
     return new Response(xml, {
       status: 200,
       headers: {
-        'Content-Type': 'text/xml',
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600'
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
+        'X-Content-Type-Options': 'nosniff'
       }
     });
   } catch (error) {
     console.error('Sitemap Error:', error);
-    const emergency = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrl}/</loc><lastmod>${today}</lastmod></url></urlset>`;
-    return new Response(emergency, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+    const emergencyXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>${baseUrl}/</loc><lastmod>${today}</lastmod></url>
+</urlset>`.trim();
+    return new Response(emergencyXml, { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' } 
+    });
   }
 };
