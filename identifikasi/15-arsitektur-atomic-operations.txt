@@ -1,0 +1,8 @@
+MASALAH: Operasi Database Tidak Atomik pada Agenda
+FILE: src/actions/agenda.ts
+
+DESKRIPSI:
+Proses penyimpanan atau publikasi agenda melibatkan beberapa query SQL yang dijalankan secara terpisah tanpa transaksi. Jika salah satu query gagal (misal: gagal update status setelah upload gambar), data agenda bisa menjadi rusak atau tidak sinkron.
+
+REKOMENDASI:
+Gunakan `sql.begin()` atau mekanisme transaksi lainnya untuk memastikan semua operasi database dalam satu alur bisnis berhasil atau gagal secara bersamaan.
