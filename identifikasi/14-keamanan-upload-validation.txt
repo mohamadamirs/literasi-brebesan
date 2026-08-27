@@ -1,8 +1,0 @@
-MASALAH: Validasi Upload File yang Lemah
-FILE: src/actions/agenda.ts, src/actions/profile.ts
-
-DESKRIPSI:
-Validasi file saat ini hanya mengecek apakah input merupakan `instanceof File`. Tidak ada pengecekan tipe MIME yang ketat atau pengecekan "magic bytes" untuk memastikan file tersebut benar-benar gambar. User bisa saja mengunggah file berbahaya dengan mengubah ekstensinya.
-
-REKOMENDASI:
-Gunakan library seperti `zod` untuk mengecek `size` dan `type`, serta pertimbangkan untuk memverifikasi tipe file di sisi server menggunakan buffer sebelum disimpan ke Vercel Blob.

@@ -1,8 +1,0 @@
-MASALAH: Kurangnya Penggunaan SQL Transactions
-FILE: src/actions/auth.ts, src/actions/posts.ts
-
-DESKRIPSI:
-Beberapa aksi (seperti registrasi user atau update konten) melakukan lebih dari satu penulisan ke database secara berurutan. Jika operasi pertama berhasil tetapi operasi kedua gagal, data akan berada dalam kondisi tidak konsisten (partial update).
-
-REKOMENDASI:
-Bungkus operasi database yang saling berkaitan di dalam satu SQL Transaction (BEGIN...COMMIT) untuk memastikan atomisitas data.

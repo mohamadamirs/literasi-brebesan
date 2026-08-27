@@ -1,8 +1,0 @@
-MASALAH: API Proxy Gambar GDrive Terbuka Tanpa Proteksi
-FILE: src/pages/api/drive-image/[id].ts
-
-DESKRIPSI:
-Endpoint proxy gambar menerima ID file Google Drive apa pun dan menampilkannya tanpa verifikasi. Ini bisa disalahgunakan oleh pihak luar untuk menggunakan server Anda sebagai proxy gambar mereka (hotlinking) atau untuk mencoba mengakses file GDrive yang ID-nya mereka ketahui namun seharusnya tidak publik.
-
-REKOMENDASI:
-Tambahkan validasi ID file (cek apakah ID tersebut ada di database `posts` atau `agendas` Anda) atau tambahkan proteksi origin/otorisasi sederhana.

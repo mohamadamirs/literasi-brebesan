@@ -1,8 +1,0 @@
-MASALAH: Risiko IDOR pada Akses Google Drive
-FILE: src/pages/api/drive-files.ts, src/lib/googleDrive.ts
-
-DESKRIPSI:
-API `/api/drive-files` menerima parameter `folderId` langsung dari client. Karena Service Account memiliki akses luas ke folder root, pengguna yang jahat bisa mencoba memasukkan `folderId` lain yang tidak seharusnya publik namun berada di dalam drive yang sama.
-
-REKOMENDASI:
-Jangan menerima `folderId` mentah dari client. Gunakan daftar ID folder yang diperbolehkan (whitelist) di sisi server, atau verifikasi apakah `folderId` tersebut memang bagian dari struktur folder publik yang telah ditentukan.

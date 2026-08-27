@@ -1,8 +1,0 @@
-MASALAH: Penanganan Error yang Tidak Konsisten (Silent Failures)
-FILE: src/lib/googleDrive.ts, src/middleware.ts
-
-DESKRIPSI:
-Beberapa fungsi menangkap error menggunakan `try-catch` namun hanya melakukan `console.error` tanpa melempar balik error atau memberikan feedback yang tepat ke user. Hal ini menyebabkan "silent failure" di mana aplikasi terlihat berjalan normal padahal terjadi kegagalan data.
-
-REKOMENDASI:
-Implementasikan sistem logging terpusat dan pastikan setiap kegagalan krusial memberikan respons error yang informatif ke layer di atasnya.

@@ -1,8 +1,0 @@
-MASALAH: Mekanisme Cache In-Memory Tidak Efektif di Serverless
-FILE: src/lib/googleDrive.ts
-
-DESKRIPSI:
-Penggunaan `new Map()` untuk caching data Google Drive hanya efektif jika server berjalan terus-menerus. Di platform Serverless seperti Vercel, fungsi sering mengalami "cold start" di mana instance baru dibuat, yang berarti cache memori akan selalu kosong. Selain itu, setiap instance memiliki cache sendiri, sehingga tidak ada pembagian data antar instance.
-
-REKOMENDASI:
-Gunakan solusi persistent cache seperti Vercel KV, Upstash Redis, atau simpan metadata file ke database utama.

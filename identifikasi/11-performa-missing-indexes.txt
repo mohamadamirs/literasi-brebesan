@@ -1,8 +1,0 @@
-MASALAH: Kurangnya Indexing pada Kolom Database Vital
-FILE: src/lib/db-scheme.txt
-
-DESKRIPSI:
-Berdasarkan skema saat ini, kolom-kolom yang sering digunakan untuk filtering dan joining seperti `posts.user_id`, `posts.status`, `posts.updated_at`, `agendas.status`, dan `agendas.event_date` tidak memiliki index. Seiring bertambahnya data, performa query akan menurun drastis karena database harus melakukan Full Table Scan.
-
-REKOMENDASI:
-Tambahkan perintah `CREATE INDEX` untuk kolom foreign key dan kolom yang sering masuk dalam klausa `WHERE` atau `ORDER BY`.

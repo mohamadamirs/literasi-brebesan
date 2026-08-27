@@ -1,8 +1,0 @@
-MASALAH: Kurangnya Resiliensi pada API Pihak Ketiga
-FILE: src/lib/googleDrive.ts, src/actions/agenda.ts
-
-DESKRIPSI:
-Integrasi dengan Google Drive dan Vercel Blob tidak memiliki mekanisme penanganan kegagalan yang kuat seperti retry (percobaan ulang) atau timeout yang jelas. Jika API pihak ketiga tersebut mengalami gangguan sesaat, aplikasi akan langsung error.
-
-REKOMENDASI:
-Implementasikan mekanisme retry sederhana dengan exponential backoff untuk request API eksternal dan pastikan ada batas waktu (timeout) agar proses server tidak menggantung.
