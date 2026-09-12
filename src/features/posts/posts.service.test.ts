@@ -299,6 +299,11 @@ describe("postsService", () => {
 
   describe("updatePost", () => {
     it("should update post as admin", async () => {
+      (prisma.post.findUnique as any).mockResolvedValueOnce({
+        id: "post-1",
+        status: "published",
+        slug: "existing-slug-123",
+      });
       (prisma.post.update as any).mockResolvedValueOnce({});
 
       const result = await postsService.updatePost(
@@ -312,11 +317,20 @@ describe("postsService", () => {
         "admin",
       );
 
-      expect(prisma.post.update).toHaveBeenCalled();
+      expect(prisma.post.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ slug: "existing-slug-123" }),
+        })
+      );
       expect(result).toEqual({ success: true });
     });
 
     it("should update post as user and set status to pending if requested published", async () => {
+      (prisma.post.findUnique as any).mockResolvedValueOnce({
+        id: "post-1",
+        status: "draft",
+        slug: "old-slug-draft",
+      });
       (prisma.post.updateMany as any).mockResolvedValueOnce({ count: 1 });
 
       const result = await postsService.updatePost(
@@ -334,9 +348,31 @@ describe("postsService", () => {
         where: { id: "post-1", userId: "user-1" },
         data: expect.objectContaining({
           status: "pending",
+          slug: "judul-update-user-12345",
         }),
       });
       expect(result).toEqual({ success: true });
+    });
+    
+    it("should not update slug if post was already published", async () => {
+      (prisma.post.findUnique as any).mockResolvedValueOnce({
+        id: "post-1",
+        status: "published",
+        slug: "old-slug-published",
+      });
+      (prisma.post.update as any).mockResolvedValueOnce({});
+
+      await postsService.updatePost(
+        "post-1",
+        { title: "Judul Baru Nih", content: "<p>Updated</p>", status: "published" },
+        "admin"
+      );
+
+      expect(prisma.post.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ slug: "old-slug-published" }),
+        })
+      );
     });
   });
 

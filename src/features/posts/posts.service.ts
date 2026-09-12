@@ -197,8 +197,17 @@ export const postsService = {
     userRole: string,
     authorId?: string
   ): Promise<{ success: boolean }> {
-    const newSlug = generateSlug(data.title);
     const safeContent = sanitizeHtml(data.content || "", sanitizeOptions);
+
+    const existingPost = await prisma.post.findUnique({
+      where: { id },
+    });
+    if (!existingPost) {
+      throw new Error("Post not found");
+    }
+    const finalSlug = existingPost.status === "draft"
+      ? generateSlug(data.title)
+      : existingPost.slug;
 
     if (userRole === "admin") {
       await prisma.post.update({
@@ -207,7 +216,7 @@ export const postsService = {
           title: data.title,
           content: safeContent,
           status: data.status,
-          slug: newSlug,
+          slug: finalSlug,
           categoryId: data.category_id || null,
           rejectionReason: data.rejection_reason || null,
         },
@@ -225,7 +234,7 @@ export const postsService = {
           title: data.title,
           content: safeContent,
           status: finalStatus,
-          slug: newSlug,
+          slug: finalSlug,
           categoryId: data.category_id || null,
           rejectionReason: null,
         },
