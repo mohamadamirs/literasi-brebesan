@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
-import { sql } from "../../../../lib/db";
+import prisma from "../../../../lib/prisma";
 import { actions } from "astro:actions";
 import UserRoleManager from "../../../../components/admin/UserRoleManager";
 
@@ -11,13 +11,23 @@ const { user: currentUser } = Astro.locals;
 if (currentUser?.role !== 'admin') return Astro.redirect('/user');
 
 // Ambil data user
-const { rows } = await sql`
-  SELECT u.id, u.email, p.full_name, p.role
-  FROM users u
-  JOIN profiles p ON u.id = p.id
-  WHERE u.id = ${id}
-`;
-const userToEdit = rows[0];
+const userRecord = id
+  ? await prisma.user.findUnique({
+      where: { id },
+      include: {
+        profile: true,
+      },
+    })
+  : null;
+
+const userToEdit = userRecord
+  ? {
+      id: userRecord.id,
+      email: userRecord.email,
+      full_name: userRecord.profile?.fullName,
+      role: userRecord.profile?.role,
+    }
+  : null;
 
 if (!userToEdit) return Astro.redirect('/admin?tab=users&error=User tidak ditemukan');
 

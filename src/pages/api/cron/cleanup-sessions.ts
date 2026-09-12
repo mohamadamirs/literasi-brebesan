@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { sql } from '../../../lib/db';
+import prisma from '../../../lib/prisma';
 
 /**
  * API ini berfungsi sebagai Cron Job untuk membersihkan sesi user
@@ -18,14 +18,17 @@ export const GET: APIRoute = async ({ request }) => {
   }
 
   try {
-    const { rowCount } = await sql`
-      DELETE FROM user_sessions
-      WHERE expires_at < NOW()
-    `;
+    const res = await prisma.userSession.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: `Berhasil membersihkan ${rowCount} sesi yang kadaluarsa.` 
+      message: `Berhasil membersihkan ${res.count} sesi yang kadaluarsa.` 
     }), { status: 200 });
 
   } catch (error) {

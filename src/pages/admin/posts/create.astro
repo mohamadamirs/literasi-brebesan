@@ -1,7 +1,7 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { actions } from "astro:actions";
-import { sql } from "../../../lib/db";
+import prisma from "../../../lib/prisma";
 import RichTextEditor from "../../../components/RichTextEditor.astro";
 import TitleEditor from "../../../components/Editor/TitleEditor";
 
@@ -9,7 +9,10 @@ const { user } = Astro.locals;
 if (user?.role !== 'admin') return Astro.redirect('/user');
 
 // Ambil daftar kategori untuk dropdown
-const { rows: categories } = await sql`SELECT id, name FROM categories ORDER BY name ASC`;
+const categories = await prisma.category.findMany({
+  select: { id: true, name: true },
+  orderBy: { name: "asc" },
+});
 
 const result = Astro.getActionResult(actions.createPost);
 if (result && !result.error) return Astro.redirect('/admin');

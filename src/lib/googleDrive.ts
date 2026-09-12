@@ -1,5 +1,5 @@
 import * as jose from "jose";
-import { sql } from "./db";
+import prisma from "./prisma";
 
 const googleEmail = import.meta.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const googleKey = import.meta.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
@@ -20,14 +20,12 @@ export interface DriveItem {
 // --- PERSISTENT CACHE (DATABASE) ---
 async function getCachedData<T>(key: string): Promise<T | null> {
   try {
-    const { rows } = await sql`
-      SELECT value FROM drive_cache 
-      WHERE key = ${key} AND expires_at > NOW()
-      LIMIT 1
-    `;
-    if (rows[0]) {
+    const cache = await prisma.driveCache.findUnique({
+      where: { key },
+    });
+    if (cache && cache.expiresAt > new Date()) {
       console.log(`[DRIVE CACHE] Hit: ${key}`);
-      return rows[0].value as T;
+      return cache.value as T;
     }
     return null;
   } catch (e) {
@@ -39,12 +37,18 @@ async function getCachedData<T>(key: string): Promise<T | null> {
 async function setCachedData(key: string, data: any, ttlSeconds: number = 3600): Promise<void> {
   try {
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    await sql`
-      INSERT INTO drive_cache (key, value, expires_at)
-      VALUES (${key}, ${JSON.stringify(data)}, ${expiresAt})
-      ON CONFLICT (key) DO UPDATE 
-      SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at
-    `;
+    await prisma.driveCache.upsert({
+      where: { key },
+      update: {
+        value: data,
+        expiresAt,
+      },
+      create: {
+        key,
+        value: data,
+        expiresAt,
+      },
+    });
   } catch (e) {
     console.error("Cache Write Error:", e);
   }

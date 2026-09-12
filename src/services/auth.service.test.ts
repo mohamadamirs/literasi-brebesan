@@ -1,12 +1,46 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../lib/db", () => {
-  const mockSql = vi.fn();
-  return {
-    sql: mockSql,
-    default: mockSql,
+const { mockTx, mockPrisma } = vi.hoisted(() => {
+  const mockTx = {
+    user: {
+      create: vi.fn(),
+    },
+    profile: {
+      create: vi.fn(),
+    },
+    userSession: {
+      create: vi.fn(),
+    },
   };
+
+  const mockPrisma = {
+    $transaction: vi.fn(async (cb: any) => cb(mockTx)),
+    user: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    profile: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    userSession: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+  };
+
+  return { mockTx, mockPrisma };
 });
+
+vi.mock("../lib/prisma", () => ({
+  default: mockPrisma,
+  prisma: mockPrisma,
+}));
 
 vi.mock("uuid", () => ({
   v4: vi.fn(() => "mock-uuid-5678"),
@@ -29,7 +63,7 @@ vi.mock("../lib/jwt", () => ({
   SECRET: new Uint8Array([1, 2, 3]),
 }));
 
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import bcrypt from "bcryptjs";
 import { authService } from "./auth.service";
 
@@ -41,13 +75,10 @@ describe("authService", () => {
   describe("registerUser", () => {
     it("should register a new user successfully and return tokens", async () => {
       // 1. Existing user check: not found
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
-      // 2. Insert into users
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
-      // 3. Insert into profiles
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
-      // 4. Insert into user_sessions
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce(null);
+      mockTx.user.create.mockResolvedValueOnce({});
+      mockTx.profile.create.mockResolvedValueOnce({});
+      mockTx.userSession.create.mockResolvedValueOnce({});
 
       const result = await authService.registerUser({
         fullName: "Test User",
@@ -55,6 +86,13 @@ describe("authService", () => {
         password: "password123",
       });
 
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: "test@example.com" },
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.user.create).toHaveBeenCalled();
+      expect(mockTx.profile.create).toHaveBeenCalled();
+      expect(mockTx.userSession.create).toHaveBeenCalled();
       expect(result.user.email).toBe("test@example.com");
       expect(result.user.fullName).toBe("Test User");
       expect(result.user.role).toBe("user");
@@ -63,9 +101,9 @@ describe("authService", () => {
     });
 
     it("should throw conflict error if email is already registered", async () => {
-      (sql as any).mockResolvedValueOnce({
-        rows: [{ id: "existing-id" }],
-      } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce({
+        id: "existing-id",
+      });
 
       await expect(
         authService.registerUser({
@@ -82,15 +120,17 @@ describe("authService", () => {
       const mockUser = {
         id: "u1",
         email: "user@example.com",
-        password_hash: "hashed_password",
-        role: "user",
-        full_name: "User One",
-        avatar_url: "https://example.com/avatar.jpg",
+        passwordHash: "hashed_password",
+        profile: {
+          role: "user",
+          fullName: "User One",
+          avatarUrl: "https://example.com/avatar.jpg",
+        },
       };
 
-      (sql as any).mockResolvedValueOnce({ rows: [mockUser] } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce(mockUser);
       (bcrypt.compare as any).mockResolvedValueOnce(true as never);
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.userSession.create as any).mockResolvedValueOnce({});
 
       const result = await authService.authenticateUser({
         email: "user@example.com",
@@ -104,7 +144,7 @@ describe("authService", () => {
     });
 
     it("should throw error when user is not found", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce(null);
 
       await expect(
         authService.authenticateUser({
@@ -118,12 +158,14 @@ describe("authService", () => {
       const mockUser = {
         id: "u1",
         email: "user@example.com",
-        password_hash: "hashed_password",
-        role: "user",
-        full_name: "User One",
+        passwordHash: "hashed_password",
+        profile: {
+          role: "user",
+          fullName: "User One",
+        },
       };
 
-      (sql as any).mockResolvedValueOnce({ rows: [mockUser] } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce(mockUser);
       (bcrypt.compare as any).mockResolvedValueOnce(false as never);
 
       await expect(
@@ -138,13 +180,18 @@ describe("authService", () => {
   describe("refreshSession", () => {
     it("should return new session when refresh token is valid and active", async () => {
       const mockSession = {
-        user_id: "u1",
-        role: "user",
-        full_name: "User One",
-        avatar_url: null,
+        userId: "u1",
+        expiresAt: new Date(Date.now() + 60000),
+        user: {
+          profile: {
+            role: "user",
+            fullName: "User One",
+            avatarUrl: null,
+          },
+        },
       };
 
-      (sql as any).mockResolvedValueOnce({ rows: [mockSession] } as any);
+      (prisma.userSession.findUnique as any).mockResolvedValueOnce(mockSession);
 
       const result = await authService.refreshSession("valid-token");
 
@@ -154,7 +201,7 @@ describe("authService", () => {
     });
 
     it("should return null when refresh token is invalid or expired", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.userSession.findUnique as any).mockResolvedValueOnce(null);
 
       const result = await authService.refreshSession("invalid-token");
 
@@ -164,18 +211,22 @@ describe("authService", () => {
 
   describe("revokeSession", () => {
     it("should delete session by refresh token", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.userSession.deleteMany as any).mockResolvedValueOnce({ count: 1 });
 
       const result = await authService.revokeSession("token-to-revoke");
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.userSession.deleteMany).toHaveBeenCalledWith({
+        where: { refreshToken: "token-to-revoke" },
+      });
       expect(result).toEqual({ success: true });
     });
   });
 
   describe("getUserRole", () => {
     it("should return user role if user exists", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [{ role: "admin" }] } as any);
+      (prisma.profile.findUnique as any).mockResolvedValueOnce({
+        role: "admin",
+      });
 
       const role = await authService.getUserRole("user-id");
 
@@ -183,7 +234,7 @@ describe("authService", () => {
     });
 
     it("should return null if user does not exist", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.profile.findUnique as any).mockResolvedValueOnce(null);
 
       const role = await authService.getUserRole("unknown-id");
 
@@ -193,10 +244,11 @@ describe("authService", () => {
 
   describe("createPasswordResetToken", () => {
     it("should generate token and update user when user exists", async () => {
-      (sql as any).mockResolvedValueOnce({
-        rows: [{ id: "u1", reset_expiry: null }],
-      } as any);
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce({
+        id: "u1",
+        resetExpiry: null,
+      });
+      (prisma.user.update as any).mockResolvedValueOnce({});
 
       const result =
         await authService.createPasswordResetToken("test@example.com");
@@ -208,7 +260,7 @@ describe("authService", () => {
     });
 
     it("should return null if user email does not exist", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.user.findUnique as any).mockResolvedValueOnce(null);
 
       const result = await authService.createPasswordResetToken(
         "nonexistent@example.com",
@@ -221,10 +273,11 @@ describe("authService", () => {
   describe("resetPassword", () => {
     it("should successfully reset password for valid token", async () => {
       const futureExpiry = new Date(Date.now() + 30 * 60 * 1000);
-      (sql as any).mockResolvedValueOnce({
-        rows: [{ id: "u1", reset_expiry: futureExpiry }],
-      } as any);
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.user.findFirst as any).mockResolvedValueOnce({
+        id: "u1",
+        resetExpiry: futureExpiry,
+      });
+      (prisma.user.update as any).mockResolvedValueOnce({});
 
       const result = await authService.resetPassword({
         token: "valid-reset-token",
@@ -236,9 +289,10 @@ describe("authService", () => {
 
     it("should reject if token is expired", async () => {
       const pastExpiry = new Date(Date.now() - 1000);
-      (sql as any).mockResolvedValueOnce({
-        rows: [{ id: "u1", reset_expiry: pastExpiry }],
-      } as any);
+      (prisma.user.findFirst as any).mockResolvedValueOnce({
+        id: "u1",
+        resetExpiry: pastExpiry,
+      });
 
       await expect(
         authService.resetPassword({
@@ -251,9 +305,9 @@ describe("authService", () => {
 
   describe("admin user management", () => {
     it("should create user", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any); // email check
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any); // insert user
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any); // insert profile
+      (prisma.user.findUnique as any).mockResolvedValueOnce(null); // email check
+      mockTx.user.create.mockResolvedValueOnce({});
+      mockTx.profile.create.mockResolvedValueOnce({});
 
       const result = await authService.createUser({
         fullName: "New Admin",
@@ -266,8 +320,8 @@ describe("authService", () => {
     });
 
     it("should update user", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any); // update user
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any); // update profile
+      (prisma.user.update as any).mockResolvedValueOnce({});
+      (prisma.profile.update as any).mockResolvedValueOnce({});
 
       const result = await authService.updateUser({
         id: "u1",
@@ -280,7 +334,7 @@ describe("authService", () => {
     });
 
     it("should delete user", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.user.delete as any).mockResolvedValueOnce({});
 
       const result = await authService.deleteUser("u1");
 

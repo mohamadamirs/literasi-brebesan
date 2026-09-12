@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { sql } from "../../../lib/db";
+import prisma from "../../../lib/prisma";
 import { actions } from "astro:actions";
 
 const { user } = Astro.locals;
@@ -10,15 +10,30 @@ if (user?.role !== 'admin') return Astro.redirect('/user');
 const { id } = Astro.params;
 
 // Ambil data artikel dan nama penulis
-const { rows } = await sql`
-  SELECT p.*, pr.full_name as author_name, c.name as category_name
-  FROM posts p
-  LEFT JOIN profiles pr ON p.user_id = pr.id
-  LEFT JOIN categories c ON p.category_id = c.id
-  WHERE p.id = ${id}
-`;
+const postData = id
+  ? await prisma.post.findUnique({
+      where: { id },
+      include: {
+        user: {
+          include: {
+            profile: true,
+          },
+        },
+        category: true,
+      },
+    })
+  : null;
 
-const post = rows[0];
+const post = postData
+  ? {
+      ...postData,
+      author_name: postData.user?.profile?.fullName || null,
+      category_name: postData.category?.name || null,
+      created_at: postData.createdAt,
+      updated_at: postData.updatedAt,
+      rejection_reason: postData.rejectionReason,
+    }
+  : null;
 
 // Jika artikel tidak ditemukan
 if (!post) return Astro.redirect('/admin');

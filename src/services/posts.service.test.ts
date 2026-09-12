@@ -1,12 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../lib/db", () => {
-  const mockSql = vi.fn();
-  return {
-    sql: mockSql,
-    default: mockSql,
+const { mockPrisma } = vi.hoisted(() => {
+  const mockPrisma = {
+    post: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
+    },
   };
+  return { mockPrisma };
 });
+
+vi.mock("../lib/prisma", () => ({
+  default: mockPrisma,
+  prisma: mockPrisma,
+}));
 
 vi.mock("../lib/utils", () => ({
   generateSlug: vi.fn(
@@ -31,7 +43,7 @@ vi.mock("sanitize-html", () => {
   };
 });
 
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { postsService } from "./posts.service";
 
 describe("postsService", () => {
@@ -41,121 +53,164 @@ describe("postsService", () => {
 
   describe("getPublishedPosts", () => {
     it("should return published posts with default limit and offset", async () => {
+      const now = new Date();
       const mockPosts = [
         {
           id: "1",
           title: "Post 1",
+          content: "Content 1",
           slug: "post-1",
           status: "published",
-          updated_at: new Date(),
-          user_id: "u1",
-        },
-        {
-          id: "2",
-          title: "Post 2",
-          slug: "post-2",
-          status: "published",
-          updated_at: new Date(),
-          user_id: "u2",
+          updatedAt: now,
+          createdAt: now,
+          userId: "u1",
+          user: { profile: { fullName: "User 1", instagram: null, avatarUrl: null } },
+          category: { name: "Tech" },
         },
       ];
-      (sql as any).mockResolvedValueOnce({ rows: mockPosts } as any);
+      (prisma.post.findMany as any).mockResolvedValueOnce(mockPosts);
 
       const result = await postsService.getPublishedPosts();
 
-      expect(sql).toHaveBeenCalled();
-      expect(result).toEqual(mockPosts);
-    });
-
-    it("should query with categoryId filter when categoryId is provided", async () => {
-      const mockPosts = [
+      expect(prisma.post.findMany).toHaveBeenCalled();
+      expect(result).toEqual([
         {
           id: "1",
           title: "Post 1",
+          content: "Content 1",
           slug: "post-1",
           status: "published",
-          updated_at: new Date(),
+          updated_at: now,
+          created_at: now,
           user_id: "u1",
+          author_name: "User 1",
+          author_instagram: null,
+          author_avatar: null,
           category_name: "Tech",
         },
-      ];
-      (sql as any).mockResolvedValueOnce({ rows: mockPosts } as any);
+      ]);
+    });
+
+    it("should query with categoryId filter when categoryId is provided", async () => {
+      (prisma.post.findMany as any).mockResolvedValueOnce([]);
 
       const result = await postsService.getPublishedPosts({
         categoryId: "cat-1",
       });
 
-      expect(sql).toHaveBeenCalled();
-      expect(result).toEqual(mockPosts);
+      expect(prisma.post.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: "published",
+            categoryId: "cat-1",
+          }),
+        }),
+      );
+      expect(result).toEqual([]);
     });
 
     it("should query with search filter when search is provided", async () => {
-      const mockPosts = [
-        {
-          id: "1",
-          title: "Astro Post",
-          slug: "astro-post",
-          status: "published",
-          updated_at: new Date(),
-          user_id: "u1",
-        },
-      ];
-      (sql as any).mockResolvedValueOnce({ rows: mockPosts } as any);
+      (prisma.post.findMany as any).mockResolvedValueOnce([]);
 
       const result = await postsService.getPublishedPosts({ search: "Astro" });
 
-      expect(sql).toHaveBeenCalled();
-      expect(result).toEqual(mockPosts);
+      expect(prisma.post.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: "published",
+            OR: [
+              { title: { contains: "Astro" } },
+              { content: { contains: "Astro" } },
+            ],
+          }),
+        }),
+      );
+      expect(result).toEqual([]);
     });
 
     it("should query with both categoryId and search filter", async () => {
-      const mockPosts = [
-        {
-          id: "1",
-          title: "Brebes Post",
-          slug: "brebes-post",
-          status: "published",
-          updated_at: new Date(),
-          user_id: "u1",
-        },
-      ];
-      (sql as any).mockResolvedValueOnce({ rows: mockPosts } as any);
+      (prisma.post.findMany as any).mockResolvedValueOnce([]);
 
       const result = await postsService.getPublishedPosts({
         categoryId: "cat-1",
         search: "Brebes",
       });
 
-      expect(sql).toHaveBeenCalled();
-      expect(result).toEqual(mockPosts);
+      expect(prisma.post.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: "published",
+            categoryId: "cat-1",
+            OR: [
+              { title: { contains: "Brebes" } },
+              { content: { contains: "Brebes" } },
+            ],
+          }),
+        }),
+      );
+      expect(result).toEqual([]);
     });
   });
 
   describe("getPostBySlug", () => {
     it("should return a single post when slug matches", async () => {
+      const now = new Date();
       const mockPost = {
         id: "1",
         title: "Post Detail",
         content: "<p>Content</p>",
         slug: "post-detail",
         status: "published",
-        updated_at: new Date(),
-        created_at: new Date(),
+        updatedAt: now,
+        createdAt: now,
+        userId: "u1",
+        user: {
+          profile: {
+            fullName: "Amir",
+            instagram: "amir_ig",
+            avatarUrl: null,
+          },
+        },
+        category: {
+          name: "General",
+        },
+      };
+      (prisma.post.findFirst as any).mockResolvedValueOnce(mockPost);
+
+      const result = await postsService.getPostBySlug("post-detail");
+
+      expect(prisma.post.findFirst).toHaveBeenCalledWith({
+        where: {
+          slug: "post-detail",
+          status: "published",
+        },
+        include: {
+          user: {
+            include: {
+              profile: true,
+            },
+          },
+          category: true,
+        },
+      });
+      expect(result).toEqual({
+        id: "1",
+        title: "Post Detail",
+        content: "<p>Content</p>",
+        slug: "post-detail",
+        status: "published",
+        updated_at: now,
+        created_at: now,
         user_id: "u1",
         author_name: "Amir",
         author_instagram: "amir_ig",
         author_avatar: null,
-      };
-      (sql as any).mockResolvedValueOnce({ rows: [mockPost] } as any);
-
-      const result = await postsService.getPostBySlug("post-detail");
-
-      expect(sql).toHaveBeenCalled();
-      expect(result).toEqual(mockPost);
+        category_name: "General",
+      });
     });
 
     it("should return null when post slug does not exist", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.findFirst as any).mockResolvedValueOnce(null);
 
       const result = await postsService.getPostBySlug("non-existent");
 
@@ -165,7 +220,11 @@ describe("postsService", () => {
 
   describe("createPost", () => {
     it("should create post with pending status if non-admin requests published", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.create as any).mockResolvedValueOnce({
+        id: "mock-uuid-1234",
+        slug: "judul-baru-12345",
+        status: "pending",
+      });
 
       const result = await postsService.createPost(
         {
@@ -178,7 +237,18 @@ describe("postsService", () => {
         "user",
       );
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.create).toHaveBeenCalledWith({
+        data: {
+          id: "mock-uuid-1234",
+          title: "Judul Baru",
+          content: "<p>Konten</p>",
+          status: "pending",
+          userId: "user-1",
+          slug: "judul-baru-12345",
+          categoryId: "cat-1",
+          rejectionReason: null,
+        },
+      });
       expect(result).toEqual({
         id: "mock-uuid-1234",
         slug: "judul-baru-12345",
@@ -187,7 +257,11 @@ describe("postsService", () => {
     });
 
     it("should allow admin to create post with published status", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.create as any).mockResolvedValueOnce({
+        id: "mock-uuid-1234",
+        slug: "judul-admin-12345",
+        status: "published",
+      });
 
       const result = await postsService.createPost(
         {
@@ -207,7 +281,11 @@ describe("postsService", () => {
     });
 
     it("should create post as draft if status is draft", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.create as any).mockResolvedValueOnce({
+        id: "mock-uuid-1234",
+        slug: "judul-draft-12345",
+        status: "draft",
+      });
 
       const result = await postsService.createPost(
         { title: "Judul Draft", content: "<p>Konten</p>", status: "draft" },
@@ -221,7 +299,7 @@ describe("postsService", () => {
 
   describe("updatePost", () => {
     it("should update post as admin", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.update as any).mockResolvedValueOnce({});
 
       const result = await postsService.updatePost(
         "post-1",
@@ -234,12 +312,12 @@ describe("postsService", () => {
         "admin",
       );
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.update).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
 
     it("should update post as user and set status to pending if requested published", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.updateMany as any).mockResolvedValueOnce({ count: 1 });
 
       const result = await postsService.updatePost(
         "post-1",
@@ -252,14 +330,19 @@ describe("postsService", () => {
         "user-1",
       );
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.updateMany).toHaveBeenCalledWith({
+        where: { id: "post-1", userId: "user-1" },
+        data: expect.objectContaining({
+          status: "pending",
+        }),
+      });
       expect(result).toEqual({ success: true });
     });
   });
 
   describe("deletePost", () => {
     it("should delete post by id for admin", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.delete as any).mockResolvedValueOnce({});
 
       const result = await postsService.deletePost(
         "post-1",
@@ -267,39 +350,55 @@ describe("postsService", () => {
         "admin",
       );
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.delete).toHaveBeenCalledWith({
+        where: { id: "post-1" },
+      });
       expect(result).toEqual({ success: true });
     });
 
     it("should delete post by id and user_id for regular user", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.deleteMany as any).mockResolvedValueOnce({ count: 1 });
 
       const result = await postsService.deletePost("post-1", "user-1", "user");
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.deleteMany).toHaveBeenCalledWith({
+        where: { id: "post-1", userId: "user-1" },
+      });
       expect(result).toEqual({ success: true });
     });
   });
 
   describe("approvePost and rejectPost", () => {
     it("should approve post and set status to published", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.update as any).mockResolvedValueOnce({});
 
       const result = await postsService.approvePost("post-1");
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.update).toHaveBeenCalledWith({
+        where: { id: "post-1" },
+        data: {
+          status: "published",
+          rejectionReason: null,
+        },
+      });
       expect(result).toEqual({ success: true });
     });
 
     it("should reject post and set status to draft with rejection reason", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.post.update as any).mockResolvedValueOnce({});
 
       const result = await postsService.rejectPost(
         "post-1",
         "Perlu revisi konten",
       );
 
-      expect(sql).toHaveBeenCalled();
+      expect(prisma.post.update).toHaveBeenCalledWith({
+        where: { id: "post-1" },
+        data: {
+          status: "draft",
+          rejectionReason: "Perlu revisi konten",
+        },
+      });
       expect(result).toEqual({ success: true });
     });
   });

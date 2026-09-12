@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
-import { sql } from "../../lib/db";
+import prisma from "../../lib/prisma";
 import { actions } from "astro:actions";
 import Pagination from "../../components/Pagination.astro";
 import UserPostCard from "../../components/posts/UserPostCard";
@@ -13,20 +13,37 @@ const limit = 10;
 const offset = (page - 1) * limit;
 
 // Hitung Total Tulisan
-const { rows: countRows } = await sql`
-  SELECT COUNT(*) as total FROM posts WHERE user_id = ${user?.id}
-`;
-const totalPosts = parseInt(countRows[0].total || '0');
+const totalPosts = user?.id
+  ? await prisma.post.count({ where: { userId: user.id } })
+  : 0;
 const totalPages = Math.ceil(totalPosts / limit);
 
 // Ambil data postingan dengan Limit & Offset
-const { rows: posts } = await sql`
-  SELECT id, title, slug, created_at, status, rejection_reason
-  FROM posts
-  WHERE user_id = ${user?.id}
-  ORDER BY created_at DESC
-  LIMIT ${limit} OFFSET ${offset}
-`;
+const postsData = user?.id
+  ? await prisma.post.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        createdAt: true,
+        status: true,
+        rejectionReason: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+    })
+  : [];
+
+const posts = postsData.map((p) => ({
+  id: p.id,
+  title: p.title,
+  slug: p.slug,
+  created_at: p.createdAt,
+  status: p.status,
+  rejection_reason: p.rejectionReason,
+}));
 ---
 
 <DashboardLayout title="Dashboard">

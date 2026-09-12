@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
-import { sql } from "../../lib/db";
+import prisma from "../../lib/prisma";
 import { actions } from "astro:actions";
 import Pagination from "../../components/Pagination.astro";
 import ArticleCard from "../../components/admin/ArticleCard";
@@ -14,7 +14,7 @@ if (user?.role !== 'admin') return Astro.redirect('/user');
 const activeTab = Astro.url.searchParams.get('tab') || 'articles';
 
 // 2. Inisialisasi Variabel Data
-let displayData = [];
+let displayData: any[] = [];
 let stats = { label1: '', val1: 0, label2: '', val2: 0, label3: '', val3: 0, color: 'blue' };
 let totalPages = 0;
 const currentPage = parseInt(Astro.url.searchParams.get('page') || '1');
@@ -24,95 +24,125 @@ const offset = (currentPage - 1) * limit;
 // 3. Logika Dinamis per Tab
 if (activeTab === 'articles') {
   // Query Stats Artikel
-  const { rows: s } = await sql`
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-      SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) as published
-    FROM posts
-  `;
+  const [total, pending, published] = await Promise.all([
+    prisma.post.count(),
+    prisma.post.count({ where: { status: 'pending' } }),
+    prisma.post.count({ where: { status: 'published' } }),
+  ]);
+
   stats = {
-    label1: 'Menunggu', val1: parseInt(s[0]?.pending || '0'),
-    label2: 'Terbit', val2: parseInt(s[0]?.published || '0'),
-    label3: 'Total', val3: parseInt(s[0]?.total || '0'),
+    label1: 'Menunggu', val1: pending,
+    label2: 'Terbit', val2: published,
+    label3: 'Total', val3: total,
     color: 'blue'
   };
 
   // Query Data Artikel
-  const { rows } = await sql`
-    SELECT p.*, pr.full_name as author, c.name as category
-    FROM posts p
-    JOIN profiles pr ON p.user_id = pr.id
-    LEFT JOIN categories c ON p.category_id = c.id
-    ORDER BY p.created_at DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
-  displayData = rows;
+  const posts = await prisma.post.findMany({
+    include: {
+      user: {
+        include: {
+          profile: true,
+        },
+      },
+      category: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    skip: offset,
+  });
+
+  displayData = posts.map(p => ({
+    ...p,
+    author: p.user?.profile?.fullName || null,
+    category: p.category?.name || null,
+    created_at: p.createdAt,
+    updated_at: p.updatedAt,
+    rejection_reason: p.rejectionReason,
+    user_id: p.userId,
+    category_id: p.categoryId,
+  }));
   totalPages = Math.ceil(stats.val3 / limit);
 
 } else if (activeTab === 'agendas') {
-  // Query Stats Agenda
-  const { rows: s } = await sql`
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN event_date >= CURRENT_DATE THEN 1 ELSE 0 END) as upcoming,
-      SUM(CASE WHEN event_date < CURRENT_DATE THEN 1 ELSE 0 END) as past
-    FROM agendas
-  `;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [total, upcoming, past] = await Promise.all([
+    prisma.agenda.count(),
+    prisma.agenda.count({ where: { eventDate: { gte: today } } }),
+    prisma.agenda.count({ where: { eventDate: { lt: today } } }),
+  ]);
+
   stats = {
-    label1: 'Mendatang', val1: parseInt(s[0]?.upcoming || '0'),
-    label2: 'Selesai', val2: parseInt(s[0]?.past || '0'),
-    label3: 'Total', val3: parseInt(s[0]?.total || '0'),
+    label1: 'Mendatang', val1: upcoming,
+    label2: 'Selesai', val2: past,
+    label3: 'Total', val3: total,
     color: 'amber'
   };
 
   // Query Data Agenda
-  const { rows } = await sql`
-    SELECT * FROM agendas
-    ORDER BY event_date DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
-  displayData = rows;
+  const agendas = await prisma.agenda.findMany({
+    orderBy: { eventDate: 'desc' },
+    take: limit,
+    skip: offset,
+  });
+
+  displayData = agendas.map(a => ({
+    ...a,
+    event_date: a.eventDate,
+    event_time: a.eventTime,
+    wa_link: a.waLink,
+    image_url: a.imageUrl,
+    publish_at: a.publishAt,
+    created_at: a.createdAt,
+  }));
   totalPages = Math.ceil(stats.val3 / limit);
 
 } else if (activeTab === 'users') {
-  // Query Stats User
-  const { rows: s } = await sql`
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) as admins,
-      SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) as users
-    FROM profiles
-  `;
+  const [total, admins, users] = await Promise.all([
+    prisma.profile.count(),
+    prisma.profile.count({ where: { role: 'admin' } }),
+    prisma.profile.count({ where: { role: 'user' } }),
+  ]);
+
   stats = {
-    label1: 'Admin', val1: parseInt(s[0]?.admins || '0'),
-    label2: 'User', val2: parseInt(s[0]?.users || '0'),
-    label3: 'Total', val3: parseInt(s[0]?.total || '0'),
+    label1: 'Admin', val1: admins,
+    label2: 'User', val2: users,
+    label3: 'Total', val3: total,
     color: 'indigo'
   };
 
   // Query Data User
-  const { rows } = await sql`
-    SELECT p.*, u.email 
-    FROM profiles p
-    JOIN users u ON p.id = u.id
-    ORDER BY p.full_name ASC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
-  displayData = rows;
-  totalPages = Math.ceil(stats.val3 / limit);
-} else if (activeTab === 'settings') {
-  // Query Stats & Total untuk Pagination
-  const { rows: s } = await sql`SELECT COUNT(*) as total FROM categories`;
-  const total = parseInt(s[0]?.total || '0');
+  const profiles = await prisma.profile.findMany({
+    include: {
+      user: {
+        select: { email: true },
+      },
+    },
+    orderBy: { fullName: 'asc' },
+    take: limit,
+    skip: offset,
+  });
 
-  // Query Data Kategori dengan Limit & Offset
-  const { rows: cats } = await sql`
-    SELECT * FROM categories 
-    ORDER BY name ASC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
-  
+  displayData = profiles.map(p => ({
+    ...p,
+    full_name: p.fullName,
+    avatar_url: p.avatarUrl,
+    created_at: p.createdAt,
+    email: p.user?.email,
+  }));
+  totalPages = Math.ceil(stats.val3 / limit);
+
+} else if (activeTab === 'settings') {
+  const total = await prisma.category.count();
+
+  const cats = await prisma.category.findMany({
+    orderBy: { name: 'asc' },
+    take: limit,
+    skip: offset,
+  });
+
   stats = {
     label1: 'Kategori', val1: total,
     label2: 'Database', val2: 1,

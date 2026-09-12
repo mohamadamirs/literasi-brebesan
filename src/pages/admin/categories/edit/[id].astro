@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
-import { sql } from "../../../../lib/db";
+import prisma from "../../../../lib/prisma";
 import { actions } from "astro:actions";
 
 const { id } = Astro.params;
@@ -10,8 +10,11 @@ const { user: currentUser } = Astro.locals;
 if (currentUser?.role !== 'admin') return Astro.redirect('/user');
 
 // Ambil data kategori
-const { rows } = await sql`SELECT * FROM categories WHERE id = ${id}`;
-const category = rows[0];
+const category = id
+  ? await prisma.category.findUnique({
+      where: { id },
+    })
+  : null;
 
 if (!category) return Astro.redirect('/admin?tab=settings&error=Kategori tidak ditemukan');
 

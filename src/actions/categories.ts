@@ -1,7 +1,7 @@
 // src/actions/categories.ts
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { v4 as uuidv4 } from "uuid";
 
 export const categoryActions = {
@@ -29,15 +29,19 @@ export const categoryActions = {
         .replace(/^-+|-+$/g, "");
 
       try {
-        await sql`
-          INSERT INTO categories (id, name, slug, description, created_at)
-          VALUES (${id}, ${input.name}, ${slug}, ${input.description || null}, NOW())
-        `;
+        await prisma.category.create({
+          data: {
+            id,
+            name: input.name,
+            slug,
+            description: input.description || null,
+          },
+        });
         return { success: true };
       } catch (e: any) {
         console.error("Create category error:", e);
-        if (e.message?.includes("unique_slug")) {
-           throw new ActionError({
+        if (e.code === "P2002" || e.message?.includes("slug")) {
+          throw new ActionError({
             code: "CONFLICT",
             message: "Slug kategori sudah ada. Gunakan nama lain.",
           });
@@ -74,11 +78,14 @@ export const categoryActions = {
         .replace(/^-+|-+$/g, "");
 
       try {
-        await sql`
-          UPDATE categories
-          SET name = ${input.name}, slug = ${slug}, description = ${input.description || null}
-          WHERE id = ${input.id}
-        `;
+        await prisma.category.update({
+          where: { id: input.id },
+          data: {
+            name: input.name,
+            slug,
+            description: input.description || null,
+          },
+        });
         return { success: true };
       } catch (e: any) {
         console.error("Update category error:", e);
@@ -104,15 +111,21 @@ export const categoryActions = {
 
       try {
         // Cek apakah ada post yang menggunakan kategori ini
-        const { rows } = await sql`SELECT COUNT(*) as count FROM posts WHERE category_id = ${input.id}`;
-        if (parseInt(rows[0].count) > 0) {
-           throw new ActionError({
+        const count = await prisma.post.count({
+          where: { categoryId: input.id },
+        });
+
+        if (count > 0) {
+          throw new ActionError({
             code: "CONFLICT",
-            message: "Kategori tidak bisa dihapus karena masih digunakan oleh beberapa artikel.",
+            message:
+              "Kategori tidak bisa dihapus karena masih digunakan oleh beberapa artikel.",
           });
         }
 
-        await sql`DELETE FROM categories WHERE id = ${input.id}`;
+        await prisma.category.delete({
+          where: { id: input.id },
+        });
         return { success: true };
       } catch (e: any) {
         if (e instanceof ActionError) throw e;

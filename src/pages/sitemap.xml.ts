@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { sql } from '../lib/db';
+import prisma from '../lib/prisma';
 
 export const GET: APIRoute = async () => {
   const baseUrl = 'https://literasibrebesan.my.id';
@@ -13,8 +13,16 @@ export const GET: APIRoute = async () => {
   };
 
   try {
-    const { rows: posts } = await sql`SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY updated_at DESC`;
-    const { rows: profiles } = await sql`SELECT id, created_at FROM profiles ORDER BY created_at DESC`;
+    const posts = await prisma.post.findMany({
+      where: { status: 'published' },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const profiles = await prisma.profile.findMany({
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
 
     let urls = [];
     
@@ -26,13 +34,15 @@ export const GET: APIRoute = async () => {
 
     // 2. Postingan Dinamis
     posts.forEach(p => {
-      const d = new Date(p.updated_at).toISOString().split('T')[0];
-      urls.push(`<url><loc>${baseUrl}/publikasi/${clean(p.slug)}</loc><lastmod>${d}</lastmod></url>`);
+      if (p.slug) {
+        const d = new Date(p.updatedAt).toISOString().split('T')[0];
+        urls.push(`<url><loc>${baseUrl}/publikasi/${clean(p.slug)}</loc><lastmod>${d}</lastmod></url>`);
+      }
     });
 
     // 3. Profil Dinamis
     profiles.forEach(p => {
-      const d = new Date(p.created_at || new Date()).toISOString().split('T')[0];
+      const d = new Date(p.createdAt || new Date()).toISOString().split('T')[0];
       urls.push(`<url><loc>${baseUrl}/p/${p.id}</loc><lastmod>${d}</lastmod></url>`);
     });
 

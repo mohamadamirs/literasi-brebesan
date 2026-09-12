@@ -1,4 +1,4 @@
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcryptjs";
 import { createSessionToken, generateRefreshToken } from "../lib/jwt";
@@ -43,11 +43,12 @@ export const authService = {
     password,
     fullName,
   }: RegisterUserInput): Promise<AuthResult> {
-    const { rows: existingUser } =
-      await sql`SELECT id FROM users WHERE email = ${email}`;
-    if (existingUser.length > 0) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) {
       const error: any = new Error(
-        "Email sudah terdaftar, silakan gunakan email lain.",
+        "Email sudah terdaftar, silakan gunakan email lain."
       );
       error.code = "CONFLICT";
       throw error;
@@ -57,8 +58,34 @@ export const authService = {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await sql`INSERT INTO users (id, email, password_hash) VALUES (${userId}, ${email}, ${hashedPassword})`;
-    await sql`INSERT INTO profiles (id, full_name, role) VALUES (${userId}, ${fullName}, 'user')`;
+    const refreshToken = generateRefreshToken();
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.create({
+        data: {
+          id: userId,
+          email,
+          passwordHash: hashedPassword,
+        },
+      });
+
+      await tx.profile.create({
+        data: {
+          id: userId,
+          fullName,
+          role: "user",
+        },
+      });
+
+      await tx.userSession.create({
+        data: {
+          userId,
+          refreshToken,
+          expiresAt,
+        },
+      });
+    });
 
     const user = {
       id: userId,
@@ -75,14 +102,6 @@ export const authService = {
       avatarUrl: null,
     });
 
-    const refreshToken = generateRefreshToken();
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-
-    await sql`
-      INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-      VALUES (${userId}, ${refreshToken}, ${expiresAt.toISOString()})
-    `;
-
     return {
       user,
       accessToken,
@@ -95,30 +114,29 @@ export const authService = {
     email,
     password,
   }: AuthenticateUserInput): Promise<AuthResult> {
-    const { rows } = await sql`
-      SELECT u.id, u.email, u.password_hash, p.role, p.full_name, p.avatar_url
-      FROM users u
-      LEFT JOIN profiles p ON u.id = p.id
-      WHERE u.email = ${email}
-    `;
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        profile: true,
+      },
+    });
 
-    const user = rows[0];
     if (!user) {
       const error: any = new Error("Email atau password Anda salah.");
       error.code = "UNAUTHORIZED";
       throw error;
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       const error: any = new Error("Email atau password Anda salah.");
       error.code = "UNAUTHORIZED";
       throw error;
     }
 
-    const role = user.role || "user";
-    const fullName = user.full_name || "User";
-    const avatarUrl = user.avatar_url || null;
+    const role = user.profile?.role || "user";
+    const fullName = user.profile?.fullName || "User";
+    const avatarUrl = user.profile?.avatarUrl || null;
 
     const accessToken = await createSessionToken({
       userId: user.id,
@@ -130,10 +148,13 @@ export const authService = {
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-    await sql`
-      INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-      VALUES (${user.id}, ${refreshToken}, ${expiresAt.toISOString()})
-    `;
+    await prisma.userSession.create({
+      data: {
+        userId: user.id,
+        refreshToken,
+        expiresAt,
+      },
+    });
 
     return {
       user: {
@@ -150,24 +171,26 @@ export const authService = {
   },
 
   async refreshSession(token: string): Promise<RefreshSessionResult | null> {
-    const { rows } = await sql`
-      SELECT s.user_id, p.role, p.full_name, p.avatar_url
-      FROM user_sessions s
-      JOIN profiles p ON s.user_id = p.id
-      WHERE s.refresh_token = ${token} AND s.expires_at > NOW()
-      LIMIT 1
-    `;
+    const session = await prisma.userSession.findUnique({
+      where: { refreshToken: token },
+      include: {
+        user: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+    });
 
-    const session = rows[0];
-    if (!session) {
+    if (!session || session.expiresAt <= new Date()) {
       return null;
     }
 
     const userData = {
-      id: session.user_id,
-      role: session.role || "user",
-      fullName: session.full_name || "User",
-      avatarUrl: session.avatar_url || null,
+      id: session.userId,
+      role: session.user?.profile?.role || "user",
+      fullName: session.user?.profile?.fullName || "User",
+      avatarUrl: session.user?.profile?.avatarUrl || null,
     };
 
     const accessToken = await createSessionToken({
@@ -184,32 +207,33 @@ export const authService = {
   },
 
   async revokeSession(token: string): Promise<{ success: boolean }> {
-    await sql`DELETE FROM user_sessions WHERE refresh_token = ${token}`;
+    await prisma.userSession.deleteMany({
+      where: { refreshToken: token },
+    });
     return { success: true };
   },
 
   async createPasswordResetToken(
-    email: string,
+    email: string
   ): Promise<{ token: string; email: string } | null> {
-    const { rows } =
-      await sql`SELECT id, reset_expiry FROM users WHERE email = ${email}`;
-    const user = rows[0];
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
     if (!user) return null;
 
-    if (user.reset_expiry) {
-      const expiryDate = new Date(user.reset_expiry);
+    if (user.resetExpiry) {
       const cooldownPeriod = 58 * 60 * 1000;
       const lastRequestPlusCooldown = new Date(
-        expiryDate.getTime() - cooldownPeriod,
+        user.resetExpiry.getTime() - cooldownPeriod
       );
       const now = new Date();
 
       if (lastRequestPlusCooldown > now) {
         const waitTime = Math.ceil(
-          (lastRequestPlusCooldown.getTime() - now.getTime()) / 1000,
+          (lastRequestPlusCooldown.getTime() - now.getTime()) / 1000
         );
         const error: any = new Error(
-          `Harap tunggu ${waitTime} detik lagi sebelum meminta tautan reset baru.`,
+          `Harap tunggu ${waitTime} detik lagi sebelum meminta tautan reset baru.`
         );
         error.code = "TOO_MANY_REQUESTS";
         throw error;
@@ -219,11 +243,13 @@ export const authService = {
     const token = uuidv4();
     const expiry = new Date(Date.now() + 60 * 60 * 1000);
 
-    await sql`
-      UPDATE users 
-      SET reset_token = ${token}, reset_expiry = ${expiry.toISOString()} 
-      WHERE id = ${user.id}
-    `;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: token,
+        resetExpiry: expiry,
+      },
+    });
 
     return { token, email };
   },
@@ -235,12 +261,9 @@ export const authService = {
     token: string;
     password: string;
   }): Promise<{ success: boolean }> {
-    const { rows } = await sql`
-      SELECT id, email, reset_expiry 
-      FROM users 
-      WHERE reset_token = ${token}
-    `;
-    const user = rows[0];
+    const user = await prisma.user.findFirst({
+      where: { resetToken: token },
+    });
 
     if (!user) {
       const error: any = new Error("Token tidak valid atau sudah kedaluwarsa.");
@@ -248,10 +271,7 @@ export const authService = {
       throw error;
     }
 
-    const expiry = new Date(user.reset_expiry);
-    const now = new Date();
-
-    if (expiry.getTime() < now.getTime()) {
+    if (!user.resetExpiry || user.resetExpiry.getTime() < Date.now()) {
       const error: any = new Error("Token sudah kedaluwarsa.");
       error.code = "BAD_REQUEST";
       throw error;
@@ -260,11 +280,14 @@ export const authService = {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await sql`
-      UPDATE users 
-      SET password_hash = ${hashedPassword}, reset_token = NULL, reset_expiry = NULL 
-      WHERE id = ${user.id}
-    `;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashedPassword,
+        resetToken: null,
+        resetExpiry: null,
+      },
+    });
 
     return { success: true };
   },
@@ -280,9 +303,10 @@ export const authService = {
     password: string;
     role?: "user" | "admin";
   }): Promise<{ id: string }> {
-    const { rows: existingUser } =
-      await sql`SELECT id FROM users WHERE email = ${email}`;
-    if (existingUser.length > 0) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) {
       const error: any = new Error("Email sudah terdaftar.");
       error.code = "CONFLICT";
       throw error;
@@ -292,8 +316,22 @@ export const authService = {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await sql`INSERT INTO users (id, email, password_hash) VALUES (${userId}, ${email}, ${hashedPassword})`;
-    await sql`INSERT INTO profiles (id, full_name, role) VALUES (${userId}, ${fullName}, ${role})`;
+    await prisma.$transaction(async (tx) => {
+      await tx.user.create({
+        data: {
+          id: userId,
+          email,
+          passwordHash: hashedPassword,
+        },
+      });
+      await tx.profile.create({
+        data: {
+          id: userId,
+          fullName,
+          role,
+        },
+      });
+    });
 
     return { id: userId };
   },
@@ -311,26 +349,40 @@ export const authService = {
     role: "user" | "admin";
     password?: string;
   }): Promise<{ success: boolean }> {
-    await sql`UPDATE users SET email = ${email} WHERE id = ${id}`;
-    await sql`UPDATE profiles SET full_name = ${fullName}, role = ${role} WHERE id = ${id}`;
-
+    const dataToUpdate: any = { email };
     if (password && password.length >= 6) {
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-      await sql`UPDATE users SET password_hash = ${hashedPassword} WHERE id = ${id}`;
+      dataToUpdate.passwordHash = await bcrypt.hash(password, salt);
     }
+
+    await prisma.user.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    await prisma.profile.update({
+      where: { id },
+      data: {
+        fullName,
+        role,
+      },
+    });
 
     return { success: true };
   },
 
   async getUserRole(userId: string): Promise<string | null> {
-    const { rows } =
-      await sql`SELECT role FROM profiles WHERE id = ${userId} LIMIT 1`;
-    return rows[0]?.role || null;
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return profile?.role || null;
   },
 
   async deleteUser(id: string): Promise<{ success: boolean }> {
-    await sql`DELETE FROM users WHERE id = ${id}`;
+    await prisma.user.delete({
+      where: { id },
+    });
     return { success: true };
   },
 };

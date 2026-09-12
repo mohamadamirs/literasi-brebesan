@@ -1,4 +1,4 @@
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { v4 as uuidv4 } from "uuid";
 import { generateSlug } from "../lib/utils";
 import sanitizeHtml from "sanitize-html";
@@ -61,92 +61,110 @@ export const postsService = {
     categoryId,
     search,
   }: GetPublishedPostsParams = {}): Promise<PostItem[]> {
-    const searchPattern = search ? `%${search}%` : null;
+    const where: any = {
+      status: "published",
+    };
 
-    if (categoryId && search) {
-      const { rows } = await sql`
-        SELECT p.title, p.content, p.slug, p.updated_at, p.user_id,
-               pr.full_name as author_name, pr.instagram as author_instagram, pr.avatar_url as author_avatar,
-               c.name as category_name
-        FROM posts p
-        LEFT JOIN profiles pr ON p.user_id = pr.id
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.status = 'published' 
-          AND p.category_id = ${categoryId}
-          AND (p.title ILIKE ${searchPattern} OR p.content ILIKE ${searchPattern})
-        ORDER BY p.updated_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      return rows as PostItem[];
-    } else if (categoryId) {
-      const { rows } = await sql`
-        SELECT p.title, p.content, p.slug, p.updated_at, p.user_id,
-               pr.full_name as author_name, pr.instagram as author_instagram, pr.avatar_url as author_avatar,
-               c.name as category_name
-        FROM posts p
-        LEFT JOIN profiles pr ON p.user_id = pr.id
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.status = 'published' AND p.category_id = ${categoryId}
-        ORDER BY p.updated_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      return rows as PostItem[];
-    } else if (search) {
-      const { rows } = await sql`
-        SELECT p.title, p.content, p.slug, p.updated_at, p.user_id,
-               pr.full_name as author_name, pr.instagram as author_instagram, pr.avatar_url as author_avatar,
-               c.name as category_name
-        FROM posts p
-        LEFT JOIN profiles pr ON p.user_id = pr.id
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.status = 'published' 
-          AND (p.title ILIKE ${searchPattern} OR p.content ILIKE ${searchPattern})
-        ORDER BY p.updated_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      return rows as PostItem[];
-    } else {
-      const { rows } = await sql`
-        SELECT p.title, p.content, p.slug, p.updated_at, p.user_id,
-               pr.full_name as author_name, pr.instagram as author_instagram, pr.avatar_url as author_avatar,
-               c.name as category_name
-        FROM posts p
-        LEFT JOIN profiles pr ON p.user_id = pr.id
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.status = 'published'
-        ORDER BY p.updated_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      return rows as PostItem[];
+    if (categoryId) {
+      where.categoryId = categoryId;
     }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search } },
+        { content: { contains: search } },
+      ];
+    }
+
+    const posts = await prisma.post.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        slug: true,
+        status: true,
+        updatedAt: true,
+        createdAt: true,
+        userId: true,
+        user: {
+          select: {
+            profile: {
+              select: {
+                fullName: true,
+                instagram: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+        category: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      take: limit,
+      skip: offset,
+    });
+
+    return posts.map((p) => ({
+      id: p.id,
+      title: p.title,
+      content: p.content,
+      slug: p.slug || "",
+      status: p.status,
+      updated_at: p.updatedAt,
+      created_at: p.createdAt,
+      user_id: p.userId,
+      author_name: p.user?.profile?.fullName || null,
+      author_instagram: p.user?.profile?.instagram || null,
+      author_avatar: p.user?.profile?.avatarUrl || null,
+      category_name: p.category?.name || null,
+    }));
   },
 
   async getPostBySlug(slug: string): Promise<PostItem | null> {
-    const { rows } = await sql`
-      SELECT
-        p.id,
-        p.title,
-        p.content,
-        p.slug,
-        p.status,
-        p.updated_at,
-        p.created_at,
-        p.user_id,
-        pr.full_name as author_name,
-        pr.instagram as author_instagram,
-        pr.avatar_url as author_avatar
-      FROM posts p
-      LEFT JOIN profiles pr ON p.user_id = pr.id
-      WHERE p.slug = ${slug} AND p.status = 'published'
-      LIMIT 1
-    `;
-    return (rows[0] as PostItem) || null;
+    const post = await prisma.post.findFirst({
+      where: {
+        slug,
+        status: "published",
+      },
+      include: {
+        user: {
+          include: {
+            profile: true,
+          },
+        },
+        category: true,
+      },
+    });
+
+    if (!post) return null;
+
+    return {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      slug: post.slug || "",
+      status: post.status,
+      updated_at: post.updatedAt,
+      created_at: post.createdAt,
+      user_id: post.userId,
+      author_name: post.user?.profile?.fullName || null,
+      author_instagram: post.user?.profile?.instagram || null,
+      author_avatar: post.user?.profile?.avatarUrl || null,
+      category_name: post.category?.name || null,
+    };
   },
 
   async createPost(
     data: CreatePostData,
     authorId: string,
-    userRole: string,
+    userRole: string
   ): Promise<{ id: string; slug: string; status: string }> {
     let finalStatus = data.status || "draft";
     if (userRole !== "admin" && finalStatus === "published") {
@@ -157,44 +175,61 @@ export const postsService = {
     const slug = generateSlug(data.title);
     const safeContent = sanitizeHtml(data.content || "", sanitizeOptions);
 
-    await sql`
-      INSERT INTO posts (id, title, content, status, user_id, slug, updated_at, category_id, rejection_reason)
-      VALUES (${id}, ${data.title}, ${safeContent}, ${finalStatus}, ${authorId}, ${slug}, NOW(), ${data.category_id || null}, NULL)
-    `;
+    const created = await prisma.post.create({
+      data: {
+        id,
+        title: data.title,
+        content: safeContent,
+        status: finalStatus,
+        userId: authorId,
+        slug,
+        categoryId: data.category_id || null,
+        rejectionReason: null,
+      },
+    });
 
-    return { id, slug, status: finalStatus };
+    return { id: created.id, slug: created.slug || slug, status: created.status };
   },
 
   async updatePost(
     id: string,
     data: UpdatePostData,
     userRole: string,
-    authorId?: string,
+    authorId?: string
   ): Promise<{ success: boolean }> {
     const newSlug = generateSlug(data.title);
     const safeContent = sanitizeHtml(data.content || "", sanitizeOptions);
 
     if (userRole === "admin") {
-      await sql`
-        UPDATE posts
-        SET title = ${data.title}, content = ${safeContent}, status = ${data.status}, slug = ${newSlug}, category_id = ${data.category_id || null}, updated_at = NOW(), rejection_reason = ${data.rejection_reason || null}
-        WHERE id = ${id}
-      `;
+      await prisma.post.update({
+        where: { id },
+        data: {
+          title: data.title,
+          content: safeContent,
+          status: data.status,
+          slug: newSlug,
+          categoryId: data.category_id || null,
+          rejectionReason: data.rejection_reason || null,
+        },
+      });
     } else {
-      const finalStatus = data.status === "published" ? "pending" : data.status;
+      const finalStatus =
+        data.status === "published" ? "pending" : data.status;
+      const where: any = { id };
       if (authorId) {
-        await sql`
-          UPDATE posts
-          SET title = ${data.title}, content = ${safeContent}, status = ${finalStatus}, slug = ${newSlug}, category_id = ${data.category_id || null}, updated_at = NOW(), rejection_reason = NULL
-          WHERE id = ${id} AND user_id = ${authorId}
-        `;
-      } else {
-        await sql`
-          UPDATE posts
-          SET title = ${data.title}, content = ${safeContent}, status = ${finalStatus}, slug = ${newSlug}, category_id = ${data.category_id || null}, updated_at = NOW(), rejection_reason = NULL
-          WHERE id = ${id}
-        `;
+        where.userId = authorId;
       }
+      await prisma.post.updateMany({
+        where,
+        data: {
+          title: data.title,
+          content: safeContent,
+          status: finalStatus,
+          slug: newSlug,
+          categoryId: data.category_id || null,
+          rejectionReason: null,
+        },
+      });
     }
     return { success: true };
   },
@@ -202,31 +237,37 @@ export const postsService = {
   async deletePost(
     id: string,
     userId: string,
-    userRole: string,
+    userRole: string
   ): Promise<{ success: boolean }> {
     if (userRole === "admin") {
-      await sql`DELETE FROM posts WHERE id = ${id}`;
+      await prisma.post.delete({ where: { id } });
     } else {
-      await sql`DELETE FROM posts WHERE id = ${id} AND user_id = ${userId}`;
+      await prisma.post.deleteMany({
+        where: { id, userId },
+      });
     }
     return { success: true };
   },
 
   async approvePost(id: string): Promise<{ success: boolean }> {
-    await sql`
-      UPDATE posts 
-      SET status = 'published', updated_at = NOW(), rejection_reason = NULL 
-      WHERE id = ${id}
-    `;
+    await prisma.post.update({
+      where: { id },
+      data: {
+        status: "published",
+        rejectionReason: null,
+      },
+    });
     return { success: true };
   },
 
   async rejectPost(id: string, reason: string): Promise<{ success: boolean }> {
-    await sql`
-      UPDATE posts 
-      SET status = 'draft', rejection_reason = ${reason}, updated_at = NOW() 
-      WHERE id = ${id}
-    `;
+    await prisma.post.update({
+      where: { id },
+      data: {
+        status: "draft",
+        rejectionReason: reason,
+      },
+    });
     return { success: true };
   },
 };

@@ -1,4 +1,5 @@
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
+import { v4 as uuidv4 } from "uuid";
 
 export interface AgendaItem {
   id: string;
@@ -33,49 +34,104 @@ export interface UpdateAgendaData extends CreateAgendaData {
 
 export const agendaService = {
   async getUpcomingAgendas(limit: number = 1): Promise<AgendaItem[]> {
-    const { rows } = await sql`
-      SELECT * FROM agendas
-      WHERE event_date >= CURRENT_DATE
-        AND status = 'published'
-      ORDER BY event_date ASC
-      LIMIT ${limit}
-    `;
-    return rows as AgendaItem[];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const agendas = await prisma.agenda.findMany({
+      where: {
+        eventDate: {
+          gte: today,
+        },
+        status: "published",
+      },
+      orderBy: {
+        eventDate: "asc",
+      },
+      take: limit,
+    });
+
+    return agendas.map((a) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      event_date: a.eventDate,
+      event_time: a.eventTime,
+      location: a.location,
+      wa_link: a.waLink,
+      image_url: a.imageUrl,
+      status: a.status as any,
+      publish_at: a.publishAt,
+      created_at: a.createdAt,
+    }));
   },
 
   async getAgendaById(id: string): Promise<AgendaItem | null> {
-    const { rows } = await sql`SELECT * FROM agendas WHERE id = ${id}`;
-    return (rows[0] as AgendaItem) || null;
+    const a = await prisma.agenda.findUnique({
+      where: { id },
+    });
+
+    if (!a) return null;
+
+    return {
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      event_date: a.eventDate,
+      event_time: a.eventTime,
+      location: a.location,
+      wa_link: a.waLink,
+      image_url: a.imageUrl,
+      status: a.status as any,
+      publish_at: a.publishAt,
+      created_at: a.createdAt,
+    };
   },
 
   async checkPublishedConflict(excludeId?: string): Promise<AgendaItem | null> {
-    let rows;
-    if (excludeId) {
-      const res = await sql`
-        SELECT id, title FROM agendas 
-        WHERE status = 'published' AND event_date >= CURRENT_DATE AND id != ${excludeId} 
-        LIMIT 1
-      `;
-      rows = res.rows;
-    } else {
-      const res = await sql`
-        SELECT id, title FROM agendas 
-        WHERE status = 'published' AND event_date >= CURRENT_DATE 
-        LIMIT 1
-      `;
-      rows = res.rows;
-    }
-    return (rows[0] as AgendaItem) || null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const conflict = await prisma.agenda.findFirst({
+      where: {
+        status: "published",
+        eventDate: {
+          gte: today,
+        },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    });
+
+    if (!conflict) return null;
+
+    return {
+      id: conflict.id,
+      title: conflict.title,
+      description: conflict.description,
+      event_date: conflict.eventDate,
+      event_time: conflict.eventTime,
+      location: conflict.location,
+      wa_link: conflict.waLink,
+      image_url: conflict.imageUrl,
+      status: conflict.status as any,
+      publish_at: conflict.publishAt,
+      created_at: conflict.createdAt,
+    };
   },
 
   async archivePublishedAgendas(): Promise<{ success: boolean }> {
-    await sql`UPDATE agendas SET status = 'archived' WHERE status = 'published'`;
+    await prisma.agenda.updateMany({
+      where: { status: "published" },
+      data: { status: "archived" },
+    });
     return { success: true };
   },
 
   async getAgendaImageUrl(id: string): Promise<string | null> {
-    const { rows } = await sql`SELECT image_url FROM agendas WHERE id = ${id}`;
-    return rows[0]?.image_url || null;
+    const agenda = await prisma.agenda.findUnique({
+      where: { id },
+      select: { imageUrl: true },
+    });
+    return agenda?.imageUrl || null;
   },
 
   async createAgenda(data: CreateAgendaData): Promise<{ success: boolean }> {
@@ -83,10 +139,13 @@ export const agendaService = {
       const conflict = await this.checkPublishedConflict();
       if (conflict) {
         if (data.override_published) {
-          await sql`UPDATE agendas SET status = 'archived' WHERE id = ${conflict.id}`;
+          await prisma.agenda.update({
+            where: { id: conflict.id },
+            data: { status: "archived" },
+          });
         } else {
           const error: any = new Error(
-            `Agenda "${conflict.title}" sedang ditayangkan. Silakan centang opsi "Timpa Agenda" jika ingin melanjutkan.`,
+            `Agenda "${conflict.title}" sedang ditayangkan. Silakan centang opsi "Timpa Agenda" jika ingin melanjutkan.`
           );
           error.code = "CONFLICT";
           throw error;
@@ -94,38 +153,51 @@ export const agendaService = {
       }
     }
 
-    let publishTime: string | null = null;
+    let publishTime: Date | null = null;
     if (data.status === "scheduled") {
       if (!data.publish_at) {
         const error: any = new Error("Mohon isi tanggal rilis otomatis.");
         error.code = "BAD_REQUEST";
         throw error;
       }
-      publishTime = data.publish_at;
+      publishTime = new Date(data.publish_at);
     } else if (data.status === "published") {
-      publishTime = new Date().toISOString();
+      publishTime = new Date();
     }
 
-    await sql`
-      INSERT INTO agendas (title, description, event_date, event_time, location, wa_link, status, publish_at, image_url)
-      VALUES (${data.title}, ${data.description}, ${data.event_date}, ${data.event_time}, ${data.location}, ${data.wa_link}, ${data.status}, ${publishTime}, ${data.image_url || null})
-    `;
+    await prisma.agenda.create({
+      data: {
+        id: uuidv4(),
+        title: data.title,
+        description: data.description,
+        eventDate: new Date(data.event_date),
+        eventTime: data.event_time,
+        location: data.location,
+        waLink: data.wa_link,
+        status: data.status,
+        publishAt: publishTime,
+        imageUrl: data.image_url || null,
+      },
+    });
 
     return { success: true };
   },
 
   async updateAgenda(
     id: string,
-    data: CreateAgendaData,
+    data: CreateAgendaData
   ): Promise<{ success: boolean }> {
     if (data.status === "published") {
       const conflict = await this.checkPublishedConflict(id);
       if (conflict) {
         if (data.override_published) {
-          await sql`UPDATE agendas SET status = 'archived' WHERE id = ${conflict.id}`;
+          await prisma.agenda.update({
+            where: { id: conflict.id },
+            data: { status: "archived" },
+          });
         } else {
           const error: any = new Error(
-            `Agenda "${conflict.title}" sedang ditayangkan. Silakan centang opsi "Timpa Agenda" jika ingin melanjutkan.`,
+            `Agenda "${conflict.title}" sedang ditayangkan. Silakan centang opsi "Timpa Agenda" jika ingin melanjutkan.`
           );
           error.code = "CONFLICT";
           throw error;
@@ -133,43 +205,55 @@ export const agendaService = {
       }
     }
 
-    let publishTime: string | null = null;
+    let publishTime: Date | null = null;
     if (data.status === "scheduled") {
       if (!data.publish_at) {
         const error: any = new Error("Mohon isi tanggal rilis otomatis.");
         error.code = "BAD_REQUEST";
         throw error;
       }
-      publishTime = data.publish_at;
+      publishTime = new Date(data.publish_at);
     } else if (data.status === "published") {
-      publishTime = new Date().toISOString();
+      publishTime = new Date();
     }
 
+    const updateData: any = {
+      title: data.title,
+      description: data.description,
+      eventDate: new Date(data.event_date),
+      eventTime: data.event_time,
+      location: data.location,
+      waLink: data.wa_link,
+      status: data.status,
+      publishAt: publishTime,
+    };
+
     if (data.image_url !== undefined) {
-      await sql`
-        UPDATE agendas 
-        SET title=${data.title}, description=${data.description}, event_date=${data.event_date}, event_time=${data.event_time}, location=${data.location}, wa_link=${data.wa_link}, status=${data.status}, publish_at=${publishTime}, image_url=${data.image_url} 
-        WHERE id=${id}
-      `;
-    } else {
-      await sql`
-        UPDATE agendas 
-        SET title=${data.title}, description=${data.description}, event_date=${data.event_date}, event_time=${data.event_time}, location=${data.location}, wa_link=${data.wa_link}, status=${data.status}, publish_at=${publishTime} 
-        WHERE id=${id}
-      `;
+      updateData.imageUrl = data.image_url;
     }
+
+    await prisma.agenda.update({
+      where: { id },
+      data: updateData,
+    });
 
     return { success: true };
   },
 
   async deleteAgenda(id: string): Promise<{ success: boolean }> {
-    await sql`DELETE FROM agendas WHERE id = ${id}`;
+    await prisma.agenda.delete({ where: { id } });
     return { success: true };
   },
 
   async quickPublishAgenda(id: string): Promise<{ success: boolean }> {
-    await sql`UPDATE agendas SET status = 'archived' WHERE status = 'published'`;
-    await sql`UPDATE agendas SET status = 'published', publish_at = NULL WHERE id = ${id}`;
+    await prisma.agenda.updateMany({
+      where: { status: "published" },
+      data: { status: "archived" },
+    });
+    await prisma.agenda.update({
+      where: { id },
+      data: { status: "published", publishAt: null },
+    });
     return { success: true };
   },
 };

@@ -1,6 +1,6 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { put, del } from "@vercel/blob";
 import bcrypt from "bcryptjs";
 
@@ -22,14 +22,14 @@ export const profileActions = {
       }
 
       try {
-        await sql`
-          UPDATE profiles 
-          SET 
-            full_name = ${input.fullName}, 
-            bio = ${input.bio || null}, 
-            instagram = ${input.instagram || null}
-          WHERE id = ${user.id}
-        `;
+        await prisma.profile.update({
+          where: { id: user.id },
+          data: {
+            fullName: input.fullName,
+            bio: input.bio || null,
+            instagram: input.instagram || null,
+          },
+        });
         return { success: true };
       } catch (e: any) {
         console.error("Update profile error:", e);
@@ -52,8 +52,11 @@ export const profileActions = {
 
       try {
         // Ambil data profil untuk hapus foto lama jika ada
-        const { rows } = await sql`SELECT avatar_url FROM profiles WHERE id = ${user.id}`;
-        const oldAvatar = rows[0]?.avatar_url;
+        const profile = await prisma.profile.findUnique({
+          where: { id: user.id },
+          select: { avatarUrl: true },
+        });
+        const oldAvatar = profile?.avatarUrl;
 
         if (oldAvatar) {
           try {
@@ -70,7 +73,11 @@ export const profileActions = {
           token: import.meta.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN,
         });
 
-        await sql`UPDATE profiles SET avatar_url = ${blob.url} WHERE id = ${user.id}`;
+        await prisma.profile.update({
+          where: { id: user.id },
+          data: { avatarUrl: blob.url },
+        });
+
         return { success: true, url: blob.url };
       } catch (e: any) {
         console.error("Update avatar error:", e);
@@ -94,10 +101,16 @@ export const profileActions = {
       if (!user) throw new ActionError({ code: "UNAUTHORIZED", message: "Silakan login." });
 
       try {
-        const { rows } = await sql`SELECT password_hash FROM users WHERE id = ${user.id}`;
-        const userData = rows[0];
+        const userData = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { passwordHash: true },
+        });
 
-        const isMatch = await bcrypt.compare(input.currentPassword, userData.password_hash);
+        if (!userData) {
+          throw new ActionError({ code: "UNAUTHORIZED", message: "User tidak ditemukan." });
+        }
+
+        const isMatch = await bcrypt.compare(input.currentPassword, userData.passwordHash);
         if (!isMatch) {
           throw new ActionError({ code: "BAD_REQUEST", message: "Password saat ini salah." });
         }
@@ -105,7 +118,11 @@ export const profileActions = {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(input.newPassword, salt);
 
-        await sql`UPDATE users SET password_hash = ${hashedPassword} WHERE id = ${user.id}`;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { passwordHash: hashedPassword },
+        });
+
         return { success: true };
       } catch (e: any) {
         if (e instanceof ActionError) throw e;

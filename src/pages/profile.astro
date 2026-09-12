@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../layouts/DashboardLayout.astro";
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { actions } from "astro:actions";
 
 const { user } = Astro.locals;
@@ -29,13 +29,20 @@ if (passwordResult && !passwordResult.error) {
 }
 
 // Ambil Data Profil
-const { rows } = await sql`
-  SELECT p.*, u.email 
-  FROM profiles p 
-  JOIN users u ON p.id = u.id 
-  WHERE p.id = ${user.id}
-`;
-const profile = rows[0];
+const profileData = await prisma.profile.findUnique({
+  where: { id: user.id },
+  include: { user: { select: { email: true } } },
+});
+
+const profile = profileData
+  ? {
+      ...profileData,
+      full_name: profileData.fullName,
+      avatar_url: profileData.avatarUrl,
+      created_at: profileData.createdAt,
+      email: profileData.user?.email,
+    }
+  : null;
 
 if (!profile) return Astro.redirect("/login");
 

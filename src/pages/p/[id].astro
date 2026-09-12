@@ -2,29 +2,51 @@
 import Layout from "../../layouts/Layout.astro";
 import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
-import { sql } from "../../lib/db";
+import prisma from "../../lib/prisma";
 
 const { id } = Astro.params;
 
-// Ambil data profil
-const { rows: profiles } = await sql`
-  SELECT * FROM profiles WHERE id = ${id}
-`;
-
-const profile = profiles[0];
-
-if (!profile) {
+if (!id) {
   return new Response("Profil tidak ditemukan.", { status: 404 });
 }
 
+// Ambil data profil
+const profileData = await prisma.profile.findUnique({
+  where: { id },
+});
+
+if (!profileData) {
+  return new Response("Profil tidak ditemukan.", { status: 404 });
+}
+
+const profile = {
+  ...profileData,
+  full_name: profileData.fullName,
+  avatar_url: profileData.avatarUrl,
+};
+
 // Ambil postingan yang sudah dipublikasikan oleh user ini
-const { rows: posts } = await sql`
-  SELECT p.title, p.slug, p.updated_at, p.content, p.user_id, c.name as category_name
-  FROM posts p
-  LEFT JOIN categories c ON p.category_id = c.id
-  WHERE p.user_id = ${id} AND p.status = 'published'
-  ORDER BY p.updated_at DESC
-`;
+const postsData = await prisma.post.findMany({
+  where: {
+    userId: id,
+    status: "published",
+  },
+  include: {
+    category: true,
+  },
+  orderBy: {
+    updatedAt: "desc",
+  },
+});
+
+const posts = postsData.map((p) => ({
+  title: p.title,
+  slug: p.slug,
+  updated_at: p.updatedAt,
+  content: p.content,
+  user_id: p.userId,
+  category_name: p.category?.name || null,
+}));
 
 const formatDate = (date: any) => {
   if (!date) return "";

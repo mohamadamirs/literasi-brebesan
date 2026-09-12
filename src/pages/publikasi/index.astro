@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
-import { sql } from "../../lib/db";
+import prisma from "../../lib/prisma";
 import { postsService } from "../../services/posts.service";
 import PublicationList from "../../components/main/PublicationList";
 import CategoryScroll from "../../components/main/CategoryScroll";
@@ -12,9 +12,10 @@ import ScrollToTop from "../../components/ScrollToTop";
 const activeCategoryId = Astro.url.searchParams.get("category");
 
 // Ambil SEMUA KATEGORI dari database
-const { rows: categories } = await sql`
-  SELECT id, name, slug FROM categories ORDER BY name ASC
-`;
+const categories = await prisma.category.findMany({
+  orderBy: { name: "asc" },
+  select: { id: true, name: true, slug: true },
+});
 
 // Ambil 9 postingan pertama untuk SSR awal
 const initialPosts = await postsService.getPublishedPosts({

@@ -1,7 +1,7 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import { actions } from "astro:actions";
-import { sql } from "../../../../lib/db";
+import prisma from "../../../../lib/prisma";
 import RichTextEditor from "../../../../components/RichTextEditor.astro";
 import TitleEditor from "../../../../components/Editor/TitleEditor";
 
@@ -12,16 +12,35 @@ const { user } = Astro.locals;
 if (user?.role !== 'admin') return Astro.redirect('/user');
 
 // Ambil data dari DB (Admin bisa edit postingan siapa saja)
-const { rows } = await sql`
-  SELECT p.*, pr.full_name as author_name 
-  FROM posts p
-  JOIN profiles pr ON p.user_id = pr.id
-  WHERE p.id = ${id}
-`;
-const post = rows[0];
+const postData = id
+  ? await prisma.post.findUnique({
+      where: { id },
+      include: {
+        user: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+    })
+  : null;
+
+const post = postData
+  ? {
+      ...postData,
+      author_name: postData.user?.profile?.fullName || null,
+      category_id: postData.categoryId,
+      rejection_reason: postData.rejectionReason,
+      updated_at: postData.updatedAt,
+      created_at: postData.createdAt,
+    }
+  : null;
 
 // Ambil daftar kategori untuk dropdown
-const { rows: categories } = await sql`SELECT id, name FROM categories ORDER BY name ASC`;
+const categories = await prisma.category.findMany({
+  select: { id: true, name: true },
+  orderBy: { name: "asc" },
+});
 
 if (!post) return Astro.redirect('/admin?error=Postingan tidak ditemukan');
 

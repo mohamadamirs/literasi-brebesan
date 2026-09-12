@@ -1,7 +1,7 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import { actions } from "astro:actions";
-import { sql } from "../../../../lib/db";
+import prisma from "../../../../lib/prisma";
 import RichTextEditor from "../../../../components/RichTextEditor.astro";
 import TitleEditor from "../../../../components/Editor/TitleEditor";
 
@@ -9,13 +9,27 @@ const { id } = Astro.params;
 const { user } = Astro.locals;
 
 // Ambil data lama dari DB
-const { rows } = await sql`
-  SELECT * FROM posts WHERE id = ${id} AND user_id = ${user?.id}
-`;
-const post = rows[0];
+const postData = id && user?.id
+  ? await prisma.post.findFirst({
+      where: { id, userId: user.id },
+    })
+  : null;
+
+const post = postData
+  ? {
+      ...postData,
+      category_id: postData.categoryId,
+      rejection_reason: postData.rejectionReason,
+      updated_at: postData.updatedAt,
+      created_at: postData.createdAt,
+    }
+  : null;
 
 // Ambil daftar kategori untuk dropdown
-const { rows: categories } = await sql`SELECT id, name FROM categories ORDER BY name ASC`;
+const categories = await prisma.category.findMany({
+  select: { id: true, name: true },
+  orderBy: { name: "asc" },
+});
 
 // Kalau iseng ngetik ID ngawur di URL, tendang!
 if (!post) return Astro.redirect('/user?error=Postingan tidak ditemukan');

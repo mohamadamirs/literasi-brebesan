@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { sql } from '../../../lib/db';
+import prisma from '../../../lib/prisma';
 
 /**
  * API ini berfungsi sebagai Cron Job untuk mempublikasikan agenda.
@@ -21,34 +21,44 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     // 1. Cari agenda yang statusnya 'scheduled' dan sudah waktunya tayang.
     // Kita ambil yang paling baru (publish_at paling besar) untuk diterbitkan.
-    const { rows: readyToPublish } = await sql`
-      SELECT id, publish_at FROM agendas
-      WHERE status = 'scheduled'
-        AND publish_at <= CURRENT_TIMESTAMP
-      ORDER BY publish_at DESC
-      LIMIT 1
-    `;
+    const readyToPublish = await prisma.agenda.findFirst({
+      where: {
+        status: 'scheduled',
+        publishAt: {
+          lte: new Date(),
+        },
+      },
+      orderBy: {
+        publishAt: 'desc',
+      },
+    });
 
-    if (readyToPublish.length > 0) {
-      const newAgendaId = readyToPublish[0].id;
-      const publishAt = readyToPublish[0].publish_at;
+    if (readyToPublish) {
+      const newAgendaId = readyToPublish.id;
+      const publishAt = readyToPublish.publishAt;
 
       // Jalankan pembaruan status dalam satu rangkaian proses
-      
-      // A. Ubah semua agenda yang sedang 'published' menjadi 'archived'
-      await sql`UPDATE agendas SET status = 'archived' WHERE status = 'published'`;
-      
-      // B. Ubah agenda 'scheduled' lain yang waktunya sudah lewat (superseded) menjadi 'archived'
-      await sql`
-        UPDATE agendas 
-        SET status = 'archived' 
-        WHERE status = 'scheduled' 
-          AND publish_at <= ${publishAt} 
-          AND id != ${newAgendaId}
-      `;
-      
-      // C. Terbitkan agenda yang paling baru
-      await sql`UPDATE agendas SET status = 'published' WHERE id = ${newAgendaId}`;
+      await prisma.$transaction([
+        // A. Ubah semua agenda yang sedang 'published' menjadi 'archived'
+        prisma.agenda.updateMany({
+          where: { status: 'published' },
+          data: { status: 'archived' },
+        }),
+        // B. Ubah agenda 'scheduled' lain yang waktunya sudah lewat (superseded) menjadi 'archived'
+        prisma.agenda.updateMany({
+          where: {
+            status: 'scheduled',
+            ...(publishAt ? { publishAt: { lte: publishAt } } : {}),
+            id: { not: newAgendaId },
+          },
+          data: { status: 'archived' },
+        }),
+        // C. Terbitkan agenda yang paling baru
+        prisma.agenda.update({
+          where: { id: newAgendaId },
+          data: { status: 'published' },
+        }),
+      ]);
 
       return new Response(JSON.stringify({ 
         success: true, 

@@ -1,14 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../lib/db", () => {
-  const mockSql = vi.fn();
+vi.mock("../lib/prisma", () => {
+  const mockPrisma = {
+    agenda: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
   return {
-    sql: mockSql,
-    default: mockSql,
+    default: mockPrisma,
+    prisma: mockPrisma,
   };
 });
 
-import { sql } from "../lib/db";
+import prisma from "../lib/prisma";
 import { agendaService } from "./agenda.service";
 
 describe("agendaService", () => {
@@ -23,34 +33,75 @@ describe("agendaService", () => {
           id: "agenda-1",
           title: "Diskusi Buku",
           description: "Diskusi buku mingguan",
-          event_date: "2026-10-01",
-          event_time: "19:00 WIB",
+          eventDate: new Date("2026-10-01"),
+          eventTime: "19:00 WIB",
           location: "Brebes",
-          wa_link: "https://wa.me/12345",
+          waLink: "https://wa.me/12345",
+          imageUrl: null,
           status: "published",
+          publishAt: null,
+          createdAt: new Date(),
         },
       ];
-      (sql as any).mockResolvedValueOnce({ rows: mockAgendas } as any);
+      (prisma.agenda.findMany as any).mockResolvedValueOnce(mockAgendas);
 
       const result = await agendaService.getUpcomingAgendas(1);
 
-      expect(sql).toHaveBeenCalled();
-      expect(result).toEqual(mockAgendas);
+      expect(prisma.agenda.findMany).toHaveBeenCalled();
+      expect(result).toEqual([
+        {
+          id: "agenda-1",
+          title: "Diskusi Buku",
+          description: "Diskusi buku mingguan",
+          event_date: mockAgendas[0].eventDate,
+          event_time: "19:00 WIB",
+          location: "Brebes",
+          wa_link: "https://wa.me/12345",
+          image_url: null,
+          status: "published",
+          publish_at: null,
+          created_at: mockAgendas[0].createdAt,
+        },
+      ]);
     });
   });
 
   describe("checkPublishedConflict", () => {
     it("should return conflict if an active published agenda exists", async () => {
-      const mockConflict = { id: "a1", title: "Existing Published" };
-      (sql as any).mockResolvedValueOnce({ rows: [mockConflict] } as any);
+      const mockConflict = {
+        id: "a1",
+        title: "Existing Published",
+        description: "Desc",
+        eventDate: new Date("2026-10-01"),
+        eventTime: "10:00",
+        location: "Brebes",
+        waLink: "https://wa.me/123",
+        imageUrl: null,
+        status: "published",
+        publishAt: null,
+        createdAt: new Date(),
+      };
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce(mockConflict);
 
       const result = await agendaService.checkPublishedConflict();
 
-      expect(result).toEqual(mockConflict);
+      expect(result).toEqual({
+        id: "a1",
+        title: "Existing Published",
+        description: "Desc",
+        event_date: mockConflict.eventDate,
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/123",
+        image_url: null,
+        status: "published",
+        publish_at: null,
+        created_at: mockConflict.createdAt,
+      });
     });
 
     it("should return null if no conflict exists", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce(null);
 
       const result = await agendaService.checkPublishedConflict();
 
@@ -61,9 +112,9 @@ describe("agendaService", () => {
   describe("createAgenda", () => {
     it("should create agenda successfully when no conflict", async () => {
       // 1. check conflict -> none
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce(null);
       // 2. insert
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.create as any).mockResolvedValueOnce({ id: "new-id" });
 
       const result = await agendaService.createAgenda({
         title: "New Agenda",
@@ -75,14 +126,22 @@ describe("agendaService", () => {
         status: "published",
       });
 
+      expect(prisma.agenda.create).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
 
     it("should throw conflict error if published agenda exists and override is false", async () => {
       // 1. check conflict -> exists
-      (sql as any).mockResolvedValueOnce({
-        rows: [{ id: "a1", title: "Active Agenda" }],
-      } as any);
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce({
+        id: "a1",
+        title: "Active Agenda",
+        description: "Desc",
+        eventDate: new Date("2026-10-01"),
+        eventTime: "10:00",
+        location: "Brebes",
+        waLink: "https://wa.me/123",
+        status: "published",
+      });
 
       await expect(
         agendaService.createAgenda({
@@ -100,13 +159,20 @@ describe("agendaService", () => {
 
     it("should archive conflicting agenda if override_published is true", async () => {
       // 1. check conflict -> exists
-      (sql as any).mockResolvedValueOnce({
-        rows: [{ id: "a1", title: "Active Agenda" }],
-      } as any);
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce({
+        id: "a1",
+        title: "Active Agenda",
+        description: "Desc",
+        eventDate: new Date("2026-10-01"),
+        eventTime: "10:00",
+        location: "Brebes",
+        waLink: "https://wa.me/123",
+        status: "published",
+      });
       // 2. archive existing
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
       // 3. insert new
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.create as any).mockResolvedValueOnce({ id: "new-id" });
 
       const result = await agendaService.createAgenda({
         title: "New Agenda",
@@ -119,13 +185,18 @@ describe("agendaService", () => {
         override_published: true,
       });
 
+      expect(prisma.agenda.update).toHaveBeenCalledWith({
+        where: { id: "a1" },
+        data: { status: "archived" },
+      });
+      expect(prisma.agenda.create).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
   });
 
   describe("updateAgenda", () => {
     it("should update agenda successfully", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
 
       const result = await agendaService.updateAgenda("a1", {
         title: "Updated Agenda",
@@ -137,25 +208,37 @@ describe("agendaService", () => {
         status: "draft",
       });
 
+      expect(prisma.agenda.update).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
   });
 
   describe("deleteAgenda and quickPublishAgenda", () => {
     it("should delete agenda by id", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.delete as any).mockResolvedValueOnce({});
 
       const result = await agendaService.deleteAgenda("a1");
 
+      expect(prisma.agenda.delete).toHaveBeenCalledWith({
+        where: { id: "a1" },
+      });
       expect(result).toEqual({ success: true });
     });
 
     it("should quick publish agenda by archiving others and publishing target", async () => {
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
-      (sql as any).mockResolvedValueOnce({ rows: [] } as any);
+      (prisma.agenda.updateMany as any).mockResolvedValueOnce({ count: 1 });
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
 
       const result = await agendaService.quickPublishAgenda("a1");
 
+      expect(prisma.agenda.updateMany).toHaveBeenCalledWith({
+        where: { status: "published" },
+        data: { status: "archived" },
+      });
+      expect(prisma.agenda.update).toHaveBeenCalledWith({
+        where: { id: "a1" },
+        data: { status: "published", publishAt: null },
+      });
       expect(result).toEqual({ success: true });
     });
   });
