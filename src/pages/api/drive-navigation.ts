@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { getArchiveNavigation } from "../../lib/googleDrive";
+import { getArchiveNavigation } from "@/features/docs/googleDrive";
 
 export const GET: APIRoute = async ({ url }) => {
   const yearId = url.searchParams.get("yearId");

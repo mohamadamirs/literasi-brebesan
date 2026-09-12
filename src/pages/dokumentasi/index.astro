@@ -1,9 +1,9 @@
 ---
-import Layout from "../../layouts/Layout.astro";
-import Header from "../../components/Header.astro";
-import FolderGallery from "../../components/docs/FolderGallery";
-import FileGallery from "../../components/docs/FileGallery";
-import Footer from "../../components/Footer.astro";
+import Layout from "@/shared/layouts/Layout.astro";
+import Header from "@/shared/layouts/Header.astro";
+import FolderGallery from "@/features/docs/FolderGallery";
+import FileGallery from "@/features/docs/FileGallery";
+import Footer from "@/shared/layouts/Footer.astro";
 
 const yearId = Astro.url.searchParams.get("yearId");
 const monthId = Astro.url.searchParams.get("monthId");

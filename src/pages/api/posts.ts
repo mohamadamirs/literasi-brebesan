@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { postsService } from "../../services/posts.service";
+import { postsService } from "@/features/posts/posts.service";
 
 export const GET: APIRoute = async ({ url }) => {
   const limit = parseInt(url.searchParams.get("limit") || "9", 10);

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { authService } from "../services/auth.service";
+import { authService } from "@/features/auth/auth.service";
 
 export const POST: APIRoute = async ({ cookies, redirect }) => {
   const refreshToken = cookies.get("refresh_token")?.value;

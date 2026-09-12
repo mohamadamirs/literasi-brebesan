@@ -1,6 +1,6 @@
 // src/pages/api/drive-files.ts
 import type { APIRoute } from "astro";
-import { getMediaFiles } from "../../lib/googleDrive";
+import { getMediaFiles } from "@/features/docs/googleDrive";
 
 export const GET: APIRoute = async ({ url }) => {
   const folderId = url.searchParams.get("folderId");

@@ -1,8 +1,8 @@
 ---
-import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { agendaService } from "../../../services/agenda.service";
+import DashboardLayout from "@/shared/layouts/DashboardLayout.astro";
+import { agendaService } from "@/features/agenda/agenda.service";
 import { actions } from "astro:actions";
-import AgendaStatusManager from "../../../components/admin/AgendaStatusManager";
+import AgendaStatusManager from "@/features/admin/AgendaStatusManager";
 
 const { id } = Astro.params;
 const { user } = Astro.locals;

@@ -1,10 +1,10 @@
 ---
-import DashboardLayout from "../../layouts/DashboardLayout.astro";
-import prisma from "../../lib/prisma";
+import DashboardLayout from "@/shared/layouts/DashboardLayout.astro";
+import prisma from "@/lib/prisma";
 import { actions } from "astro:actions";
-import Pagination from "../../components/Pagination.astro";
-import ArticleCard from "../../components/admin/ArticleCard";
-import UserCard from "../../components/admin/UserCard";
+import Pagination from "@/shared/ui/Pagination.astro";
+import ArticleCard from "@/features/admin/ArticleCard";
+import UserCard from "@/features/admin/UserCard";
 
 // Proteksi Admin
 const { user } = Astro.locals;

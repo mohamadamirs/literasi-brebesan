@@ -1,7 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { jwtVerify } from "jose";
-import { SECRET } from "./lib/jwt";
-import { authService } from "./services/auth.service";
+import { SECRET } from "@/shared/utils/jwt";
+import { authService } from "@/features/auth/auth.service";
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { cookies, url, redirect, locals } = context;

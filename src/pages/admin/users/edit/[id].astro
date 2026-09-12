@@ -1,8 +1,8 @@
 ---
-import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
-import prisma from "../../../../lib/prisma";
+import DashboardLayout from "@/shared/layouts/DashboardLayout.astro";
+import prisma from "@/lib/prisma";
 import { actions } from "astro:actions";
-import UserRoleManager from "../../../../components/admin/UserRoleManager";
+import UserRoleManager from "@/features/admin/UserRoleManager";
 
 const { id } = Astro.params;
 const { user: currentUser } = Astro.locals;

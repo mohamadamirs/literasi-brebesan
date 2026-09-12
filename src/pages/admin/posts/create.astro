@@ -1,9 +1,9 @@
 ---
-import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import DashboardLayout from "@/shared/layouts/DashboardLayout.astro";
 import { actions } from "astro:actions";
-import prisma from "../../../lib/prisma";
-import RichTextEditor from "../../../components/RichTextEditor.astro";
-import TitleEditor from "../../../components/Editor/TitleEditor";
+import prisma from "@/lib/prisma";
+import RichTextEditor from "@/features/posts/RichTextEditor.astro";
+import TitleEditor from "@/features/posts/TitleEditor";
 
 const { user } = Astro.locals;
 if (user?.role !== 'admin') return Astro.redirect('/user');

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import prisma from '../../../lib/prisma';
+import prisma from "@/lib/prisma";
 
 /**
  * API ini berfungsi sebagai Cron Job untuk mempublikasikan agenda.

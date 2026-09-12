@@ -1,9 +1,9 @@
 ---
-import DashboardLayout from "../../layouts/DashboardLayout.astro";
-import prisma from "../../lib/prisma";
+import DashboardLayout from "@/shared/layouts/DashboardLayout.astro";
+import prisma from "@/lib/prisma";
 import { actions } from "astro:actions";
-import Pagination from "../../components/Pagination.astro";
-import UserPostCard from "../../components/posts/UserPostCard";
+import Pagination from "@/shared/ui/Pagination.astro";
+import UserPostCard from "@/features/posts/UserPostCard";
 
 const { user } = Astro.locals;
 

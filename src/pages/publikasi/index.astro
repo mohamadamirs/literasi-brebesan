@@ -1,12 +1,12 @@
 ---
-import Layout from "../../layouts/Layout.astro";
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
-import prisma from "../../lib/prisma";
-import { postsService } from "../../services/posts.service";
-import PublicationList from "../../components/main/PublicationList";
-import CategoryScroll from "../../components/main/CategoryScroll";
-import ScrollToTop from "../../components/ScrollToTop";
+import Layout from "@/shared/layouts/Layout.astro";
+import Header from "@/shared/layouts/Header.astro";
+import Footer from "@/shared/layouts/Footer.astro";
+import prisma from "@/lib/prisma";
+import { postsService } from "@/features/posts/posts.service";
+import PublicationList from "@/features/posts/PublicationList";
+import CategoryScroll from "@/features/posts/CategoryScroll";
+import ScrollToTop from "@/shared/ui/ScrollToTop";
 
 // Ambil kategori aktif dari query param
 const activeCategoryId = Astro.url.searchParams.get("category");

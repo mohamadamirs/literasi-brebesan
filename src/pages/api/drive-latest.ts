@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { getLatestMedia } from "../../lib/googleDrive";
+import { getLatestMedia } from "@/features/docs/googleDrive";
 
 export const GET: APIRoute = async ({ url }) => {
   const limitStr = url.searchParams.get("limit");

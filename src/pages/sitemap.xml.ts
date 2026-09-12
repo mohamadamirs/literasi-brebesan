@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import prisma from '../lib/prisma';
+import prisma from "@/lib/prisma";
 
 export const GET: APIRoute = async () => {
   const baseUrl = 'https://literasibrebesan.my.id';

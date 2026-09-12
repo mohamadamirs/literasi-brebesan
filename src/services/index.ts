@@ -1,3 +1,3 @@
-export * from "./posts.service";
-export * from "./auth.service";
-export * from "./agenda.service";
+export * from "@/features/posts/posts.service";
+export * from "@/features/auth/auth.service";
+export * from "@/features/agenda/agenda.service";

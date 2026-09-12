@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { agendaService } from "../../services/agenda.service";
+import { agendaService } from "@/features/agenda/agenda.service";
 
 export const GET: APIRoute = async () => {
   try {
