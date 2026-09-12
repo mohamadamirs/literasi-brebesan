@@ -1,14 +1,18 @@
 import { defineMiddleware } from "astro:middleware";
 import { jwtVerify } from "jose";
-import { sql } from "./lib/db";
-import { SECRET, createSessionToken } from "./lib/jwt";
+import { SECRET } from "./lib/jwt";
+import { authService } from "./services/auth.service";
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { cookies, url, redirect, locals } = context;
 
   // 1. BYPASS SEO & STATIC FILES
-  const seoFiles = ['/sitemap.xml', '/robots.txt', '/favicon.ico'];
-  if (seoFiles.some(file => url.pathname === file || url.pathname === file + '/')) {
+  const seoFiles = ["/sitemap.xml", "/robots.txt", "/favicon.ico"];
+  if (
+    seoFiles.some(
+      (file) => url.pathname === file || url.pathname === file + "/",
+    )
+  ) {
     return next();
   }
 
@@ -35,35 +39,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // JALUR 2: REFRESH FLOW (JIKA ACCESS TOKEN TIDAK ADA/EXPIRED)
   if (!userData && refreshToken) {
     try {
-      // Cek Refresh Token ke Database
-      const { rows } = await sql`
-        SELECT s.user_id, p.role, p.full_name, p.avatar_url
-        FROM user_sessions s
-        JOIN profiles p ON s.user_id = p.id
-        WHERE s.refresh_token = ${refreshToken} AND s.expires_at > NOW()
-        LIMIT 1
-      `;
+      const sessionResult = await authService.refreshSession(refreshToken);
 
-      const session = rows[0];
-
-      if (session) {
-        // Refresh token valid, terbitkan access token baru
-        userData = {
-          id: session.user_id,
-          role: session.role,
-          fullName: session.full_name,
-          avatarUrl: session.avatar_url,
-        };
-
-        const newAccessToken = await createSessionToken({
-          userId: userData.id,
-          role: userData.role,
-          fullName: userData.fullName,
-          avatarUrl: userData.avatarUrl,
-        });
+      if (sessionResult) {
+        userData = sessionResult.user;
 
         // Set cookie baru
-        cookies.set("access_token", newAccessToken, {
+        cookies.set("access_token", sessionResult.accessToken, {
           path: "/",
           httpOnly: true,
           secure: import.meta.env.PROD,
@@ -83,8 +65,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // 3. CEK OTORISASI ADMIN (DATABASE RE-VERIFICATION)
   if (userData && url.pathname.startsWith("/admin")) {
-    const { rows } = await sql`SELECT role FROM profiles WHERE id = ${userData.id} LIMIT 1`;
-    const currentRole = rows[0]?.role;
+    const currentRole = await authService.getUserRole(userData.id);
 
     if (currentRole !== "admin") {
       cookies.delete("access_token", { path: "/" });

@@ -1,17 +1,11 @@
 import type { APIRoute } from "astro";
-import { sql } from "../../lib/db";
+import { agendaService } from "../../services/agenda.service";
 
 export const GET: APIRoute = async () => {
   try {
-    const { rows } = await sql`
-      SELECT * FROM agendas
-      WHERE event_date >= CURRENT_DATE
-        AND status = 'published'
-      ORDER BY event_date ASC
-      LIMIT 1
-    `;
+    const agendas = await agendaService.getUpcomingAgendas(1);
 
-    return new Response(JSON.stringify(rows[0] || null), {
+    return new Response(JSON.stringify(agendas[0] || null), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

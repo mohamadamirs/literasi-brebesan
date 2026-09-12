@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { sql } from "../../../lib/db";
+import { agendaService } from "../../../services/agenda.service";
 import { actions } from "astro:actions";
 import AgendaStatusManager from "../../../components/admin/AgendaStatusManager";
 
@@ -8,20 +8,15 @@ const { id } = Astro.params;
 const { user } = Astro.locals;
 if (user?.role !== 'admin') return Astro.redirect('/user');
 
+if (!id) return Astro.redirect('/admin');
+
 // Ambil data agenda yang mau diedit
-const { rows } = await sql`SELECT * FROM agendas WHERE id = ${id}`;
-const agenda = rows[0];
+const agenda = await agendaService.getAgendaById(id);
 if (!agenda) return Astro.redirect('/admin');
 
 // Cek apakah ada agenda LAIN yang statusnya published
-const { rows: conflict } = await sql`
-  SELECT title FROM agendas
-  WHERE status = 'published'
-  AND event_date >= CURRENT_DATE
-  AND id != ${id}
-  LIMIT 1
-`;
-const hasConflict = conflict.length > 0;
+const conflict = await agendaService.checkPublishedConflict(id);
+const hasConflict = !!conflict;
 
 const result = Astro.getActionResult(actions.saveAgenda);
 if (result && !result.error) return Astro.redirect('/admin');

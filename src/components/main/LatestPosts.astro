@@ -1,26 +1,9 @@
 ---
-import { sql } from "../../lib/db";
+import { postsService } from "../../services/posts.service";
 import { Image } from "astro:assets";
 import { formatDate, truncateTitle, truncateText, extractFirstImage } from "../../lib/utils";
 
-const { rows: posts } = await sql`
-  SELECT 
-    p.title, 
-    p.slug, 
-    p.content, 
-    p.updated_at, 
-    p.user_id,
-    pr.full_name as author_name,
-    pr.avatar_url as author_avatar,
-    pr.instagram as author_instagram,
-    c.name as category_name
-  FROM posts p
-  LEFT JOIN profiles pr ON p.user_id = pr.id
-  LEFT JOIN categories c ON p.category_id = c.id
-  WHERE p.status = 'published'
-  ORDER BY p.updated_at DESC
-  LIMIT 3
-`;
+const posts = await postsService.getPublishedPosts({ limit: 3 });
 ---
 
 <section id="posts" class="py-20 md:py-32 bg-slate-50 relative overflow-hidden border-t border-slate-100 scroll-mt-20 md:scroll-mt-28">

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { sql } from "../lib/db";
+import { authService } from "../services/auth.service";
 
 export const POST: APIRoute = async ({ cookies, redirect }) => {
   const refreshToken = cookies.get("refresh_token")?.value;
@@ -7,7 +7,7 @@ export const POST: APIRoute = async ({ cookies, redirect }) => {
   // 1. Hapus session dari Database jika ada
   if (refreshToken) {
     try {
-      await sql`DELETE FROM user_sessions WHERE refresh_token = ${refreshToken}`;
+      await authService.revokeSession(refreshToken);
     } catch (e) {
       console.error("Logout DB Error:", e);
     }

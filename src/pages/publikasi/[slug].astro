@@ -2,25 +2,18 @@
 import Layout from "../../layouts/Layout.astro";
 import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
-import { sql } from "../../lib/db";
+import { postsService } from "../../services/posts.service";
 
 const { slug } = Astro.params;
 
-const { rows } = await sql`
-  SELECT
-    p.title,
-    p.content,
-    p.updated_at,
-    p.user_id,
-    pr.full_name as author_name,
-    pr.instagram as author_instagram,
-    pr.avatar_url as author_avatar
-  FROM posts p
-  LEFT JOIN profiles pr ON p.user_id = pr.id
-  WHERE p.slug = ${slug} AND p.status = 'published'
-`;
+if (!slug) {
+  return new Response("Maaf, artikel tidak ditemukan atau belum dipublikasikan.", {
+    status: 404,
+    statusText: 'Not found'
+  });
+}
 
-const post = rows[0];
+const post = await postsService.getPostBySlug(slug);
 
 if (!post) {
   return new Response("Maaf, artikel tidak ditemukan atau belum dipublikasikan.", {

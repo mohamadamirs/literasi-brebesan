@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
 import { sql } from "../../lib/db";
+import { postsService } from "../../services/posts.service";
 import PublicationList from "../../components/main/PublicationList";
 import CategoryScroll from "../../components/main/CategoryScroll";
 import ScrollToTop from "../../components/ScrollToTop";
@@ -16,48 +17,10 @@ const { rows: categories } = await sql`
 `;
 
 // Ambil 9 postingan pertama untuk SSR awal
-let initialPosts;
-if (activeCategoryId) {
-  const { rows } = await sql`
-    SELECT
-      p.title,
-      p.content,
-      p.slug,
-      p.updated_at,
-      p.user_id,
-      pr.full_name as author_name,
-      pr.instagram as author_instagram,
-      pr.avatar_url as author_avatar,
-      c.name as category_name
-    FROM posts p
-    LEFT JOIN profiles pr ON p.user_id = pr.id
-    LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.status = 'published' AND p.category_id = ${activeCategoryId}
-    ORDER BY p.updated_at DESC
-    LIMIT 9
-  `;
-  initialPosts = rows;
-} else {
-  const { rows } = await sql`
-    SELECT
-      p.title,
-      p.content,
-      p.slug,
-      p.updated_at,
-      p.user_id,
-      pr.full_name as author_name,
-      pr.instagram as author_instagram,
-      pr.avatar_url as author_avatar,
-      c.name as category_name
-    FROM posts p
-    LEFT JOIN profiles pr ON p.user_id = pr.id
-    LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.status = 'published'
-    ORDER BY p.updated_at DESC
-    LIMIT 9
-  `;
-  initialPosts = rows;
-}
+const initialPosts = await postsService.getPublishedPosts({
+  limit: 9,
+  categoryId: activeCategoryId,
+});
 ---
 
 <Layout title="Publikasi | Literasi Brebesan" description="Kumpulan tulisan dan cerita dari teman-teman Brebes.">
