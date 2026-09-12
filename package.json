@@ -8,6 +8,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "test": "vitest run",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -38,7 +39,9 @@
     "vite": "^7"
   },
   "devDependencies": {
+    "@esbuild/linux-arm64": "0.27.7",
     "@preact/preset-vite": "^2.10.5",
+    "@rollup/rollup-linux-arm64-gnu": "^4.63.2",
     "@testing-library/preact": "^3.2.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.20.0",

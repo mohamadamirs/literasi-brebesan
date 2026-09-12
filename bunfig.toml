@@ -1,0 +1,3 @@
+[install]
+backend = "copyfile"
+optional = false
