@@ -10,10 +10,10 @@ Dokumen ini merinci arsitektur teknis, tumpukan teknologi, dan desain sistem unt
 | **Framework Utama** | [Astro](https://astro.build/) (v6.x) |
 | **UI Library (Islands)** | [Preact](https://preactjs.com/) |
 | **Bahasa Pemrograman** | [TypeScript](https://www.typescriptlang.org/) |
-| **Database** | PostgreSQL (Vercel Postgres) *(Rencana: TiDB)* |
-| **ORM / Data Access** | Parameterized SQL (`@vercel/postgres` & `pg`) *(Rencana: Prisma)* |
+| **Database** | [TiDB Cloud](https://en.pingcap.com/tidb/) (Distributed SQL / MySQL Protocol) |
+| **ORM / Data Access** | [Prisma ORM](https://www.prisma.io/) (v6.x) |
 | **Otentikasi** | JWT (`jose`), Cookies HTTP-only & Refresh Token DB |
-| **Penyimpanan Media/Arsip** | Vercel Blob & Google Drive API *(Evaluasi storage: TBD)* |
+| **Penyimpanan Media/Arsip** | Penyimpanan Lokal (`public/uploads/`) & Sinkronisasi Vercel Blob |
 | **Styling** | Tailwind CSS v4 via `@tailwindcss/vite` |
 | **Test Runner** | Vitest |
 

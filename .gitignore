@@ -33,3 +33,8 @@ gha-creds-*.json
 /src/generated/prisma
 
 .env*.local
+
+# local uploads
+public/uploads/*
+!public/uploads/.gitkeep
+!public/uploads/blob-manifest.json

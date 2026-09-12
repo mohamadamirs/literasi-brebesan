@@ -1,0 +1,109 @@
+// prisma/schema.prisma
+// Skema database Literasi Brebesan yang disesuaikan untuk TiDB (MySQL Protocol)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.VarChar(36)
+  email        String        @unique @db.VarChar(255)
+  passwordHash String        @map("password_hash") @db.Text
+  resetToken   String?       @map("reset_token") @db.VarChar(255)
+  resetExpiry  DateTime?     @map("reset_expiry")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  
+  profile      Profile?
+  posts        Post[]
+  sessions     UserSession[]
+
+  @@map("users")
+}
+
+model Profile {
+  id        String   @id @db.VarChar(36)
+  fullName  String?  @map("full_name") @db.VarChar(255)
+  bio       String?  @db.Text
+  role      String   @default("user") @db.VarChar(50)
+  instagram String?  @db.VarChar(100)
+  avatarUrl String?  @map("avatar_url") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user      User     @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  name        String   @db.VarChar(100)
+  slug        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  posts       Post[]
+
+  @@map("categories")
+}
+
+model Post {
+  id              String    @id @default(uuid()) @db.VarChar(36)
+  title           String    @db.VarChar(255)
+  content         String?   @db.LongText
+  status          String    @default("draft") @db.VarChar(50)
+  userId          String    @map("user_id") @db.VarChar(36)
+  slug            String?   @unique @db.VarChar(255)
+  categoryId      String?   @map("category_id") @db.VarChar(36)
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([userId])
+  @@map("posts")
+}
+
+model Agenda {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  title       String    @db.VarChar(255)
+  description String    @db.Text
+  eventDate   DateTime  @map("event_date") @db.Date
+  eventTime   String    @map("event_time") @db.VarChar(100)
+  location    String    @db.VarChar(255)
+  waLink      String    @default("https://wa.me/628993986415") @map("wa_link") @db.VarChar(255)
+  imageUrl    String?   @map("image_url") @db.Text
+  status      String    @default("draft") @db.VarChar(50)
+  publishAt   DateTime? @map("publish_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("agendas")
+}
+
+model UserSession {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  userId       String   @map("user_id") @db.VarChar(36)
+  refreshToken String   @unique @map("refresh_token") @db.VarChar(500)
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model DriveCache {
+  key       String   @id @db.VarChar(255)
+  value     Json
+  expiresAt DateTime @map("expires_at")
+
+  @@map("drive_cache")
+}
