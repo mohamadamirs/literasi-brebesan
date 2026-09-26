@@ -1,91 +1,152 @@
-# Technical Design Document - Literasi Brebesan (libes-main)
+# Technical Design Document - Literasi Brebesan
 
-Dokumen ini merinci arsitektur teknis, tumpukan teknologi, dan desain sistem untuk proyek **Literasi Brebesan**.
+Dokumen ini merinci arsitektur teknis, tumpukan teknologi, dan desain sistem untuk proyek **Literasi Brebesan** sesuai dengan kondisi aktual repositori saat ini.
 
 ## 1. Tumpukan Teknologi (Tech Stack)
 
 | Komponen | Teknologi |
 | :--- | :--- |
-| **Runtime & Package Manager** | [Bun](https://bun.sh/) |
-| **Framework Utama** | [Astro](https://astro.build/) (v6.x) |
+| **Runtime** | Node.js / Bun-compatible |
+| **Framework Utama** | [Astro](https://astro.build/) |
 | **UI Library (Islands)** | [Preact](https://preactjs.com/) |
 | **Bahasa Pemrograman** | [TypeScript](https://www.typescriptlang.org/) |
-| **Database** | [TiDB Cloud](https://en.pingcap.com/tidb/) (Distributed SQL / MySQL Protocol) |
-| **ORM / Data Access** | [Prisma ORM](https://www.prisma.io/) (v6.x) |
-| **Otentikasi & Keamanan** | JWT (`jose`), Refresh Token DB, In-Memory Rate Limiting |
-| **Penyimpanan Media/Gambar** | [ImageKit.io](https://imagekit.io/) (Image CDN & Optimization) |
-| **Penyimpanan Arsip Docs** | Google Drive API terintegrasi |
+| **Database** | MySQL-compatible database via Prisma, di konfigurasi untuk TiDB / MySQL protocol |
+| **ORM / Data Access** | [Prisma ORM](https://www.prisma.io/) |
+| **Otentikasi & Keamanan** | JWT (`jose`), refresh token DB, rate limiting, middleware auth |
+| **Penyimpanan Media/Gambar** | [ImageKit.io](https://imagekit.io/) |
+| **Penyimpanan Arsip Docs** | Google Drive API + cache internal |
 | **Styling** | Tailwind CSS v4 via `@tailwindcss/vite` |
 | **Test Runner** | Vitest |
+| **Deployment Target** | Vercel |
 
 ## 2. Arsitektur Sistem
 
-Proyek ini menggunakan pola arsitektur **Islands Architecture** khas Astro dengan pemisahan tanggung jawab yang ketat:
+Proyek ini menggunakan pola arsitektur **Astro Islands** dengan pemisahan tanggung jawab yang jelas:
 
-### A. Middleware (`src/middleware.ts`)
+### A. Middleware autentikasi (`src/middleware.ts`)
 Bertanggung jawab atas:
-- Verifikasi keamanan pada setiap permintaan (request).
-- Validasi JWT secara *stateless* (umur token 10 menit).
-- Proteksi rute berdasarkan peran (Role-based Access Control):
-    - `/admin/*`: Hanya untuk admin.
-    - `/dashboard`, `/profile`: Hanya untuk pengguna terotentikasi.
-- Redireksi otomatis jika pengguna tidak memiliki akses.
+- Verifikasi akses token JWT dan flow refresh token.
+- Menetapkan `locals.user` untuk setiap request.
+- Mengizinkan atau menolak akses ke rute yang bersifat protected.
+- Redirect otomatis untuk `/admin`, `/user`, `/dashboard`, dan halaman auth seperti `/login`.
+- Menutup akses ke file SEO statis dan asset publik tertentu.
 
-### B. Astro Actions (`src/actions/`)
-Logika bisnis sisi server yang dipisahkan berdasarkan domain:
-- `auth.ts`: Registrasi, login, logout, reset password (dilengkapi Rate Limiter).
-- `posts.ts`: CRUD untuk artikel dan publikasi (termasuk auto-delete media ImageKit).
-- `agenda.ts`: Pengelolaan jadwal kegiatan (termasuk Optimistic Locking pada Cron).
-- `profile.ts`: Pembaruan informasi pengguna.
+Prinsip amanannya adalah: jika user tidak valid dan rute protected, ia diarahkan ke login; jika route admin dan user bukan admin, akses ditolak.
 
-### C. Library & Utilitas (`src/lib/` & `src/shared/utils/`)
-- `db.ts` / `prisma.ts`: Inisialisasi koneksi database Prisma.
-- `googleDrive.ts`: Abstraksi API Google Drive.
-- `imagekit.ts`: Singleton dan fungsi pembantu (upload/delete) untuk ImageKit API.
-- `rate-limiter.ts`: Sliding-window limiter untuk proteksi *Brute-Force*.
-- `cron-auth.ts`: Fail-closed security checker untuk endpoint Cron.
+### B. Server actions dan logika domain (`src/actions/index.ts`)
+Aplikasi membangun kumpulan action server dari modul fitur. Struktur yang benar sesuai implementasi saat ini adalah:
+- `authActions` dari `@/features/auth/auth`
+- `postActions` dari `@/features/posts/posts`
+- `agendaActions` dari `@/features/agenda/agenda`
+- `profileActions` dari `@/features/auth/profile`
+- `categoryActions` dari `@/features/posts/categories`
+- `contactActions` dari `@/features/home/contact`
+
+Fitur ini mencakup:
+- registrasi, login, logout, reset password
+- CRUD postingan dan kategori
+- manajemen agenda
+- update profil dan foto pengguna
+- pengiriman kontak/feedback
+
+### C. Modul fitur (`src/features/`)
+Setiap domain dipisah menjadi feature module yang terorganisasi sendiri:
+- `auth/`: login, session, reset password, profil
+- `posts/`: artikel, kategori, editor, publikasi
+- `agenda/`: agenda dan status publikasi
+- `admin/`: UI dan komponen panel admin
+- `docs/`: galeri, Google Drive, navigasi dokumentasi
+- `home/`: halaman depan, hero, kontak, CTA
+
+### D. Shared utilities dan layout (`src/shared/` dan `src/lib/`)
+- `src/shared/layouts/`: layout umum untuk halaman publik dan dashboard
+- `src/shared/ui/`: komponen UI reusable
+- `src/shared/utils/`: helper keamanan, `jwt`, `imagekit`, `rate-limiter`, `cron-auth`
+- `src/lib/prisma.ts`: inisialisasi Prisma Client
+
+Catatan penting: beberapa utilitas yang disebutkan di dokumen lama berada di lokasi yang berbeda dari struktur lama. Implementasi yang benar saat ini menempatkan `imagekit` dan `rate-limiter` di `src/shared/utils`, serta Google Drive pada `src/features/docs/googleDrive.ts`.
 
 ## 3. Infrastruktur Media & Storage
 
-- **ImageKit.io (Media Aktif):** Menggantikan penyimpanan lokal dan Vercel Blob untuk performa *delivery* gambar yang optimal (CDN) dan manajemen *storage leak* yang kuat. Gambar yang tidak terpakai dari artikel, profil, atau agenda dihapus secara otomatis.
-- **Google Drive (Arsip):** Digunakan untuk dokumentasi pasif (galeri foto kegiatan) tanpa membebani server utama, dilindungi oleh cache lokal dan proxy internal (`/api/drive-image/[id]`).
+- **ImageKit.io (Media Aktif):** Digunakan untuk upload, optimasi, dan delivery gambar melalui CDN. File yang tidak lagi dipakai dapat dihapus secara otomatis di sisi aplikasi.
+- **Google Drive (Arsip Dokumen/Galeri):** Digunakan untuk arsip dokumen dan galeri visual. Data diambil melalui API, lalu diproses dan dipakai di halaman publik dan dokumentasi.
+- **Public uploads:** Folder `public/uploads` dan asset statis seperti favicon, logo, dan gambar brand disimpan di folder publik untuk akses langsung.
 
 ## 4. Model Data
 
-Skema database didefinisikan secara relasional untuk mendukung fitur komunitas:
+Skema database didefinisikan secara relasional di [prisma/schema.prisma](prisma/schema.prisma) dan mencakup entitas utama:
 
-- **Users & Profiles:** Memisahkan data kredensial (email, password) dengan data publik (nama, bio, foto).
-- **Posts:** Mendukung sistem kategori, slug unik untuk SEO, dan status publikasi (Draft/Published).
-- **Agendas:** Menyimpan data kegiatan dengan detail waktu dan lokasi.
+- **User:** data login dan identitas pengguna
+- **Profile:** data profil publik pengguna seperti nama lengkap, bio, peran, avatar, Instagram
+- **Category:** kategori publikasi
+- **Post:** konten artikel/publikasi, status, slug, kategori, alasan penolakan
+- **Agenda:** data kegiatan komunitas dengan tanggal, waktu, lokasi, link WhatsApp, status publikasi
+- **UserSession:** sesi login dan refresh token
+- **DriveCache:** cache untuk data Google Drive agar akses lebih efisien
 
 ## 5. Struktur Folder Utama
 
 ```text
 src/
-├── actions/      # Logika server-side (Astro Actions)
-├── components/   # UI Components (Astro & Preact)
-│   ├── main/     # Komponen landing page
-│   └── docs/     # Komponen galeri/arsip Drive
-├── layouts/      # Template halaman utama
-├── lib/          # Utilitas inti dan konfigurasi DB
-└── pages/        # Definisi rute (file-based routing)
-    ├── admin/    # Panel admin
-    ├── api/      # Endpoint API internal
-    └── publikasi/# Halaman konten publik
+├── actions/                    # Kumpulan action server yang dipanggil oleh Astro
+├── features/                  # Modul domain per fitur
+│   ├── admin/
+│   ├── agenda/
+│   ├── auth/
+│   ├── docs/
+│   ├── home/
+│   └── posts/
+├── lib/                       # Utility inti / konfigurasi framework
+│   └── prisma.ts
+├── pages/                     # File-based routing Astro
+│   ├── admin/
+│   ├── api/
+│   ├── publikasi/
+│   ├── user/
+│   └── ...
+├── services/                  # Integrasi ke layanan eksternal
+│   └── whatsapp.service.ts
+├── shared/                    # Layout, komponen reusable, utility umum
+│   ├── layouts/
+│   ├── ui/
+│   └── utils/
+├── styles/                    # Global CSS
+├── test-mocks/                # Mock data untuk testing
+├── middleware.ts              # Gatekeeper autentikasi/otorisasi
+└── ...
+
+public/
+├── assets/
+├── fonts/
+├── uploads/
+├── robots.txt
+├── favicon.ico
+└── ...
+
+prisma/
+└── schema.prisma
 ```
 
 ## 6. Alur Kerja Pengembangan
 
-1. **Runtime:** Menggunakan [Bun](https://bun.sh/) sebagai JavaScript runtime dan package manager (`bun dev`, `bun run build`, `bun test`).
-2. **Reproduction:** Selalu buat test case atau script reproduksi sebelum memperbaiki bug.
-3. **Type Safety:** Pastikan semua data memiliki interface/type yang jelas.
-4. **Performance:** Gunakan komponen Astro (static) sebanyak mungkin, dan gunakan Preact (client islands) hanya saat interaktivitas diperlukan.
+1. **Development Runtime:** Proyek dapat dijalankan dengan Astro dan script npm (`npm run dev`, `npm run build`, `npm test`).
+2. **Reproduction:** Sebelum memperbaiki bug, buat kasus reproduksi atau test yang memvalidasi masalah.
+3. **Type Safety:** Gunakan TypeScript secara konsisten agar data dan API tetap aman.
+4. **Performance:** Prioritaskan komponen Astro untuk rendering statis; Preact dipakai pada bagian interaktif yang memang perlu client island.
+5. **Security-first:** Middleware, JWT, refresh session, dan rate limiting harus selalu diperhatikan saat memodifikasi rute autentikasi atau admin.
 
-## 7. Status Migrasi & Keamanan (Update Terbaru)
+## 7. Status Implementasi & Keamanan Saat Ini
 
-- **Database (TiDB):** Skema dan arsitektur telah sepenuhnya kompatibel dan berjalan di atas TiDB/Prisma MySQL Protocol.
-- **Penyimpanan Media:** Migrasi penuh dari Vercel Blob ke **ImageKit.io** telah diselesaikan untuk manajemen media (*upload*, *auto-delete*, dan pengiriman via CDN).
-- **Hardened Security:**
-  - Token JWT dikonfigurasi secara *short-lived* (10 menit) dipadukan dengan *Force Session Revocation* saat perubahan role / reset password, menjamin pemutusan akses seketika.
-  - Rate Limiter terpasang pada aksi autentikasi (Login, Register, Forgot Password) guna menahan *Brute-Force / DDoS*.
-  - *Cron Jobs* diproteksi *Fail-Closed* dengan `CRON_SECRET` dan mengimplementasikan *Optimistic Locking* untuk mencegah *Race Condition* pada *serverless execution*.
+- **Database:** Skema Prisma sesuai kebutuhan aplikasi publikasi komunitas dan sistem role user/admin.
+- **Media Management:** ImageKit telah diintegrasikan untuk penyimpanan dan delivery gambar.
+- **Google Drive Archive:** Dapat dimanfaatkan untuk dokumentasi galeri, dengan endpoint API khusus seperti `drive-latest`, `drive-files`, dan `drive-navigation`.
+- **Keamanan:**
+  - JWT access token digunakan untuk autentikasi stateless.
+  - Refresh token disimpan di DB dan dipakai untuk sesi yang aktif.
+  - Middleware memeriksa otorisasi tiap request untuk rute admin dan user.
+  - Rate limiter dipasang pada aksi autentikasi untuk menahan brute-force.
+  - Cron endpoint dilindungi dengan mekanisme `cron-auth` untuk mencegah akses tidak sah.
+
+## 8. Catatan Konsistensi Dokumentasi
+
+Dokumen ini disusun agar konsisten dengan struktur repositori yang sesungguhnya. Beberapa istilah yang sebelumnya terlalu umum atau merujuk ke struktur lama telah disesuaikan agar mencerminkan implementasi nyata di proyek saat ini.
