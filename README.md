@@ -39,10 +39,3 @@ Aplikasi ini didesain tangguh di atas lingkungan *serverless* dengan fitur:
 
 `Beranda` → `Publikasi` → `Masuk/Daftar` → `Dasbor`
 
-## ⚖️ Lisensi
-
-Kode sumber proyek ini dilindungi oleh lisensi **GNU General Public License v3.0**. Silakan merujuk ke berkas [LICENSE](LICENSE) untuk informasi lebih lanjut.
-
----
-
-_Mari majukan literasi Brebes bersama-sama._
