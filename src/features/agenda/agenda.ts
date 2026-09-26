@@ -1,6 +1,6 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro:schema";
-import { put, del } from "@vercel/blob";
+import { uploadToImageKit, deleteFromImageKitByUrl } from "@/shared/utils/imagekit";
 import { agendaService } from "@/features/agenda/agenda.service";
 
 export const agendaActions = {
@@ -38,26 +38,19 @@ export const agendaActions = {
             const oldImageUrl = await agendaService.getAgendaImageUrl(input.id);
             if (oldImageUrl) {
               try {
-                await del(oldImageUrl, {
-                  token:
-                    import.meta.env.BLOB_READ_WRITE_TOKEN ||
-                    process.env.BLOB_READ_WRITE_TOKEN,
-                });
+                await deleteFromImageKitByUrl(oldImageUrl);
               } catch (delError) {
-                console.error("Gagal menghapus blob lama:", delError);
+                console.error("Gagal menghapus gambar agenda lama:", delError);
               }
             }
           }
 
-          const blob = await put(
-            `agenda-posters/${Date.now()}-${input.poster.name}`,
-            input.poster,
-            {
-              access: "public",
-              token:
-                import.meta.env.BLOB_READ_WRITE_TOKEN ||
-                process.env.BLOB_READ_WRITE_TOKEN,
-            },
+          const buffer = Buffer.from(await input.poster.arrayBuffer());
+          const filename = `${Date.now()}-${input.poster.name.replace(/[^a-zA-Z0-9.-]/g, "")}`;
+          const blob = await uploadToImageKit(
+            buffer,
+            filename,
+            "/literasibrebesan/agenda-posters"
           );
           imageUrl = blob.url;
         } catch (blobError: any) {
@@ -119,13 +112,9 @@ export const agendaActions = {
         const oldImageUrl = await agendaService.getAgendaImageUrl(id);
         if (oldImageUrl) {
           try {
-            await del(oldImageUrl, {
-              token:
-                import.meta.env.BLOB_READ_WRITE_TOKEN ||
-                process.env.BLOB_READ_WRITE_TOKEN,
-            });
+            await deleteFromImageKitByUrl(oldImageUrl);
           } catch (delError) {
-            console.error("Gagal menghapus blob saat delete agenda:", delError);
+            console.error("Gagal menghapus gambar saat delete agenda:", delError);
           }
         }
 

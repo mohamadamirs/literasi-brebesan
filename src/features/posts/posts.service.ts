@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from "uuid";
 import { generateSlug } from "@/shared/utils/utils";
 import sanitizeHtml from "sanitize-html";
 
+import { deleteFromImageKitByUrl } from "@/shared/utils/imagekit";
+
 export const sanitizeOptions = {
   allowedTags: sanitizeHtml.defaults.allowedTags.concat([
     "img",
@@ -248,13 +250,47 @@ export const postsService = {
     userId: string,
     userRole: string
   ): Promise<{ success: boolean }> {
-    if (userRole === "admin") {
-      await prisma.post.delete({ where: { id } });
-    } else {
+    if (userRole !== "admin") {
+      const userPost = await prisma.post.findFirst({
+        where: { id, userId },
+        select: { content: true }
+      });
+      if (!userPost) return { success: false };
+
+      if (userPost.content) {
+        const imgRegex = /<img[^>]+src="([^">]+)"/g;
+        let match;
+        while ((match = imgRegex.exec(userPost.content)) !== null) {
+          if (match[1].includes("ik.imagekit.io")) {
+            deleteFromImageKitByUrl(match[1]).catch(() => {});
+          }
+        }
+      }
+      
       await prisma.post.deleteMany({
         where: { id, userId },
       });
+      return { success: true };
     }
+
+    const postToDelete = await prisma.post.findUnique({
+      where: { id },
+      select: { content: true },
+    });
+
+    if (!postToDelete) return { success: false };
+
+    if (postToDelete.content) {
+      const imgRegex = /<img[^>]+src="([^">]+)"/g;
+      let match;
+      while ((match = imgRegex.exec(postToDelete.content)) !== null) {
+        if (match[1].includes("ik.imagekit.io")) {
+          deleteFromImageKitByUrl(match[1]).catch(() => {});
+        }
+      }
+    }
+
+    await prisma.post.delete({ where: { id } });
     return { success: true };
   },
 

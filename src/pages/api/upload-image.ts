@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { put } from '@vercel/blob';
+import { uploadToImageKit } from '@/shared/utils/imagekit';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
@@ -19,7 +19,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return new Response(JSON.stringify({ error: "No image file found" }), { status: 400 });
   }
 
-  // Validasi tipe MIME di sisi server
   if (!ALLOWED_TYPES.includes(file.type)) {
     return new Response(
       JSON.stringify({ error: "Format file tidak didukung. Gunakan JPG, PNG, atau WEBP." }),
@@ -27,7 +26,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     );
   }
 
-  // Validasi ukuran file di sisi server (maks 3MB)
   if (file.size > MAX_SIZE) {
     return new Response(
       JSON.stringify({ error: "Ukuran gambar terlalu besar. Maksimal 3MB." }),
@@ -36,34 +34,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   try {
-    // Persingkat nama file untuk menghindari URL yang terlalu panjang
     const extension = file.name.split('.').pop() || 'jpg';
     const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${extension}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Mode lokal (development): simpan ke public/uploads/posts/
-    if (import.meta.env.DEV) {
+    // Mode lokal (development) jika IMAGEKIT_PUBLIC_KEY tidak diatur
+    const isImageKitConfigured = !!(import.meta.env.IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY);
+
+    if (import.meta.env.DEV && !isImageKitConfigured) {
       const uploadDir = join(process.cwd(), 'public', 'uploads', 'posts');
       await mkdir(uploadDir, { recursive: true });
-      const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(join(uploadDir, filename), buffer);
       return new Response(JSON.stringify({ url: `/uploads/posts/${filename}` }), { status: 200 });
     }
 
-    // Mode produksi: upload ke Vercel Blob
-    const token = process.env.BLOB_READ_WRITE_TOKEN || import.meta.env.BLOB_READ_WRITE_TOKEN;
+    // Mode produksi: upload ke ImageKit
+    const now = new Date();
+    const folder = `/literasibrebesan/posts/${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    const result = await uploadToImageKit(buffer, filename, folder);
 
-    const blob = await put(`posts/${filename}`, file, {
-      access: 'public',
-      token: token,
-      contentType: file.type, // PENTING: Beritahu Vercel tipe konten aslinya
-    });
-
-    return new Response(JSON.stringify({ url: blob.url }), { status: 200 });
+    return new Response(JSON.stringify({ url: result.url }), { status: 200 });
   } catch (error: any) {
-    console.error("Blob upload error details:", error.message);
+    console.error("Image upload error details:", error);
     return new Response(JSON.stringify({
       error: "Failed to upload image",
-      details: error.message
+      details: error.message || String(error)
     }), { status: 500 });
   }
 };

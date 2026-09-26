@@ -1,5 +1,7 @@
 import type { APIRoute } from 'astro';
 import prisma from "@/lib/prisma";
+import { whatsappService } from "@/services/whatsapp.service";
+import { verifyCronRequest } from "@/shared/utils/cron-auth";
 
 /**
  * API ini berfungsi sebagai Cron Job untuk mempublikasikan agenda.
@@ -7,15 +9,9 @@ import prisma from "@/lib/prisma";
  * Jika ada agenda baru yang siap terbit, agenda lama akan otomatis diarsipkan.
  */
 export const GET: APIRoute = async ({ request }) => {
-  const cronSecret = import.meta.env.CRON_SECRET;
-  const authHeader = request.headers.get('Authorization');
-
-  // Keamanan: Cek CRON_SECRET jika dikonfigurasi di env
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Unauthorized' 
-    }), { status: 401 });
+  const auth = verifyCronRequest(request);
+  if (!auth.authorized) {
+    return auth.response!;
   }
 
   try {
@@ -37,7 +33,7 @@ export const GET: APIRoute = async ({ request }) => {
       const newAgendaId = readyToPublish.id;
       const publishAt = readyToPublish.publishAt;
 
-      // Jalankan pembaruan status dalam satu rangkaian proses
+      // Jalankan pembaruan status dalam satu rangkaian proses (Optimistic Locking)
       await prisma.$transaction([
         // A. Ubah semua agenda yang sedang 'published' menjadi 'archived'
         prisma.agenda.updateMany({
@@ -53,12 +49,27 @@ export const GET: APIRoute = async ({ request }) => {
           },
           data: { status: 'archived' },
         }),
-        // C. Terbitkan agenda yang paling baru
-        prisma.agenda.update({
-          where: { id: newAgendaId },
+        // C. Terbitkan agenda yang paling baru secara kondisional
+        prisma.agenda.updateMany({
+          where: { 
+            id: newAgendaId, 
+            status: 'scheduled' // Mencegah bentrok jika sudah ditangani cron instance lain
+          },
           data: { status: 'published' },
         }),
       ]);
+
+      // Kirim notifikasi WhatsApp saat agenda resmi tayang
+      whatsappService
+        .notifyAgendaPublished({
+          title: readyToPublish.title,
+          eventDate: readyToPublish.eventDate,
+          eventTime: readyToPublish.eventTime,
+          location: readyToPublish.location,
+          waLink: readyToPublish.waLink,
+          imageUrl: readyToPublish.imageUrl,
+        })
+        .catch((err) => console.warn("[WA Agenda Notification Failed]", err));
 
       return new Response(JSON.stringify({ 
         success: true, 

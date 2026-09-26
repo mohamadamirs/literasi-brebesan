@@ -3,6 +3,7 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { authService } from "@/features/auth/auth.service";
 import { Resend } from "resend";
+import { rateLimiter, getClientIp } from "@/shared/utils/rate-limiter";
 
 export const authActions = {
   signIn: defineAction({
@@ -12,16 +13,32 @@ export const authActions = {
       password: z.string().min(1, "Password wajib diisi."),
     }),
     handler: async (input, context) => {
+      const ip = getClientIp(context.request, context.clientAddress);
+      const rl = rateLimiter.check(`signin:${ip}`, {
+        max: 10,
+        windowMs: 15 * 60 * 1000,
+      });
+
+      if (!rl.success) {
+        throw new ActionError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Terlalu banyak percobaan masuk. Coba lagi dalam ${Math.ceil(rl.retryAfterSeconds / 60)} menit.`,
+        });
+      }
+
       try {
         const { accessToken, refreshToken } =
           await authService.authenticateUser(input);
+
+        // Reset rate limiter setelah login berhasil
+        rateLimiter.reset(`signin:${ip}`);
 
         context.cookies.set("access_token", accessToken, {
           path: "/",
           httpOnly: true,
           secure: import.meta.env.PROD,
           sameSite: "lax",
-          maxAge: 60 * 60 * 2, // 2 jam
+          maxAge: 60 * 10, // 10 menit
         });
 
         context.cookies.set("refresh_token", refreshToken, {
@@ -60,6 +77,20 @@ export const authActions = {
       password: z.string().min(6, "Password minimal 6 karakter."),
     }),
     handler: async (input, context) => {
+      const ip = getClientIp(context.request, context.clientAddress);
+      const rl = rateLimiter.check(`register:${ip}`, {
+        max: 5,
+        windowMs: 60 * 60 * 1000, // 1 jam
+      });
+
+      if (!rl.success) {
+        throw new ActionError({
+          code: "TOO_MANY_REQUESTS",
+          message:
+            "Terlalu banyak pendaftaran dari perangkat ini. Coba lagi dalam 1 jam.",
+        });
+      }
+
       try {
         const { accessToken, refreshToken } =
           await authService.registerUser(input);
@@ -69,7 +100,7 @@ export const authActions = {
           httpOnly: true,
           secure: import.meta.env.PROD,
           sameSite: "lax",
-          maxAge: 60 * 60 * 2, // 2 jam
+          maxAge: 60 * 10, // 10 menit
         });
 
         context.cookies.set("refresh_token", refreshToken, {
@@ -107,6 +138,27 @@ export const authActions = {
       email: z.string().email("Format email tidak valid."),
     }),
     handler: async (input, context) => {
+      const ip = getClientIp(context.request, context.clientAddress);
+      const ipRl = rateLimiter.check(`forgot-ip:${ip}`, {
+        max: 5,
+        windowMs: 30 * 60 * 1000,
+      });
+      const emailRl = rateLimiter.check(
+        `forgot-email:${input.email.toLowerCase()}`,
+        {
+          max: 3,
+          windowMs: 30 * 60 * 1000,
+        },
+      );
+
+      if (!ipRl.success || !emailRl.success) {
+        throw new ActionError({
+          code: "TOO_MANY_REQUESTS",
+          message:
+            "Terlalu banyak permintaan reset kata sandi. Coba lagi dalam 30 menit.",
+        });
+      }
+
       try {
         const resetInfo = await authService.createPasswordResetToken(
           input.email,
@@ -189,7 +241,21 @@ export const authActions = {
         message: "Password dan konfirmasi tidak cocok.",
         path: ["confirmPassword"],
       }),
-    handler: async (input) => {
+    handler: async (input, context) => {
+      const ip = getClientIp(context?.request, context?.clientAddress);
+      const rl = rateLimiter.check(`reset-pwd:${ip}`, {
+        max: 10,
+        windowMs: 15 * 60 * 1000,
+      });
+
+      if (!rl.success) {
+        throw new ActionError({
+          code: "TOO_MANY_REQUESTS",
+          message:
+            "Terlalu banyak percobaan reset kata sandi. Coba lagi dalam beberapa saat.",
+        });
+      }
+
       try {
         await authService.resetPassword({
           token: input.token,

@@ -380,6 +380,11 @@ describe("postsService", () => {
   describe("deletePost", () => {
     it("should delete post by id for admin", async () => {
       (prisma.post.delete as any).mockResolvedValueOnce({});
+      (prisma.post.findUnique as any).mockResolvedValueOnce({
+        id: "post-1",
+        content: "<p>hello</p>",
+        userId: "user-99"
+      });
 
       const result = await postsService.deletePost(
         "post-1",
@@ -395,6 +400,11 @@ describe("postsService", () => {
 
     it("should delete post by id and user_id for regular user", async () => {
       (prisma.post.deleteMany as any).mockResolvedValueOnce({ count: 1 });
+      (prisma.post.findFirst as any).mockResolvedValueOnce({
+        id: "post-1",
+        content: "<p>hello</p>",
+        userId: "user-1"
+      });
 
       const result = await postsService.deletePost("post-1", "user-1", "user");
 

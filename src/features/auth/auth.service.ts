@@ -254,6 +254,44 @@ export const authService = {
     return { token, email };
   },
 
+  async changePassword({
+    userId,
+    currentPassword,
+    newPassword,
+  }: {
+    userId: string;
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ success: boolean }> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new Error("User tidak ditemukan.");
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      const error: any = new Error("Password saat ini salah.");
+      error.code = "BAD_REQUEST";
+      throw error;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: hashedPassword },
+    });
+
+    // REVOKE ALL SESSIONS TO FORCE RELOGIN (Security Issue 2)
+    await prisma.userSession.deleteMany({
+      where: { userId },
+    });
+
+    return { success: true };
+  },
+
   async resetPassword({
     token,
     password,
@@ -287,6 +325,11 @@ export const authService = {
         resetToken: null,
         resetExpiry: null,
       },
+    });
+
+    // REVOKE ALL SESSIONS TO SECURE THE ACCOUNT
+    await prisma.userSession.deleteMany({
+      where: { userId: user.id },
     });
 
     return { success: true };
@@ -349,10 +392,22 @@ export const authService = {
     role: "user" | "admin";
     password?: string;
   }): Promise<{ success: boolean }> {
+    const existingProfile = await prisma.profile.findUnique({
+      where: { id },
+      select: { role: true }
+    });
+
     const dataToUpdate: any = { email };
+    let shouldRevokeSessions = false;
+
     if (password && password.length >= 6) {
       const salt = await bcrypt.genSalt(10);
       dataToUpdate.passwordHash = await bcrypt.hash(password, salt);
+      shouldRevokeSessions = true;
+    }
+
+    if (existingProfile?.role !== role) {
+      shouldRevokeSessions = true;
     }
 
     await prisma.user.update({
@@ -367,6 +422,12 @@ export const authService = {
         role,
       },
     });
+
+    if (shouldRevokeSessions) {
+      await prisma.userSession.deleteMany({
+        where: { userId: id },
+      });
+    }
 
     return { success: true };
   },

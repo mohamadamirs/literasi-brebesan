@@ -1,7 +1,8 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import prisma from "@/lib/prisma";
-import { put, del } from "@vercel/blob";
+import { uploadToImageKit, deleteFromImageKitByUrl } from "@/shared/utils/imagekit";
+import { authService } from "@/features/auth/auth.service";
 import bcrypt from "bcryptjs";
 
 export const profileActions = {
@@ -60,18 +61,15 @@ export const profileActions = {
 
         if (oldAvatar) {
           try {
-            await del(oldAvatar, {
-              token: import.meta.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN,
-            });
+            await deleteFromImageKitByUrl(oldAvatar);
           } catch (delError) {
             console.error("Gagal hapus avatar lama:", delError);
           }
         }
 
-        const blob = await put(`avatars/${user.id}-${Date.now()}-${input.avatar.name}`, input.avatar, {
-          access: "public",
-          token: import.meta.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN,
-        });
+        const buffer = Buffer.from(await input.avatar.arrayBuffer());
+        const filename = `${user.id}-${Date.now()}-${input.avatar.name.replace(/[^a-zA-Z0-9.-]/g, "")}`;
+        const blob = await uploadToImageKit(buffer, filename, "/literasibrebesan/avatars");
 
         await prisma.profile.update({
           where: { id: user.id },
@@ -110,21 +108,17 @@ export const profileActions = {
           throw new ActionError({ code: "UNAUTHORIZED", message: "User tidak ditemukan." });
         }
 
-        const isMatch = await bcrypt.compare(input.currentPassword, userData.passwordHash);
-        if (!isMatch) {
-          throw new ActionError({ code: "BAD_REQUEST", message: "Password saat ini salah." });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(input.newPassword, salt);
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { passwordHash: hashedPassword },
+        await authService.changePassword({
+          userId: user.id,
+          currentPassword: input.currentPassword,
+          newPassword: input.newPassword,
         });
 
         return { success: true };
       } catch (e: any) {
+        if (e.code === "BAD_REQUEST") {
+          throw new ActionError({ code: "BAD_REQUEST", message: e.message });
+        }
         if (e instanceof ActionError) throw e;
         console.error("Change password error:", e);
         throw new ActionError({ code: "INTERNAL_SERVER_ERROR", message: "Gagal mengganti password." });

@@ -51,7 +51,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
           httpOnly: true,
           secure: import.meta.env.PROD,
           sameSite: "lax",
-          maxAge: 60 * 60 * 2, // 2 jam
+          maxAge: 60 * 10, // 10 menit
         });
       } else {
         // Refresh token invalid atau expired di DB
@@ -64,11 +64,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   locals.user = userData;
 
-  // 3. CEK OTORISASI ADMIN (DATABASE RE-VERIFICATION)
-  if (userData && url.pathname.startsWith("/admin")) {
-    const currentRole = await authService.getUserRole(userData.id);
-
-    if (currentRole !== "admin") {
+  // 3. CEK OTORISASI ADMIN (STATELESS VIA JWT)
+  if (url.pathname.startsWith("/admin")) {
+    if (userData?.role !== "admin") {
       cookies.delete("access_token", { path: "/" });
       cookies.delete("refresh_token", { path: "/" });
       return redirect("/login?error=unauthorized");
