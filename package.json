@@ -9,6 +9,8 @@
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
+    "migrate:imagekit": "npx tsx scripts/migrate-to-imagekit.ts",
+    "sync:db-imagekit": "npx tsx scripts/sync-db-imagekit.ts",
     "format": "prettier --write ."
   },
   "dependencies": {

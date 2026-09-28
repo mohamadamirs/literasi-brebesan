@@ -7,12 +7,10 @@ let imagekit: ImageKit | null = null;
 
 export function getImageKit(): ImageKit {
   if (!imagekit) {
-    const publicKey =
-      import.meta.env.IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY;
-    const privateKey =
-      import.meta.env.IMAGEKIT_PRIVATE_KEY || process.env.IMAGEKIT_PRIVATE_KEY;
-    const urlEndpoint =
-      import.meta.env.IMAGEKIT_URL_ENDPOINT || process.env.IMAGEKIT_URL_ENDPOINT;
+    const env = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : process.env;
+    const publicKey = env.IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY;
+    const privateKey = env.IMAGEKIT_PRIVATE_KEY || process.env.IMAGEKIT_PRIVATE_KEY;
+    const urlEndpoint = env.IMAGEKIT_URL_ENDPOINT || process.env.IMAGEKIT_URL_ENDPOINT;
 
     if (!publicKey || !privateKey || !urlEndpoint) {
       console.warn(

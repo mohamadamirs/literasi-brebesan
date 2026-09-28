@@ -1,5 +1,6 @@
 import * as jose from "jose";
 import prisma from "@/lib/prisma";
+import crypto from 'node:crypto';
 
 const googleEmail = import.meta.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const googleKey = import.meta.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
@@ -17,11 +18,17 @@ export interface DriveItem {
   webContentLink?: string;
 }
 
+function hashKey(key: string): string {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
 // --- PERSISTENT CACHE (DATABASE) ---
 async function getCachedData<T>(key: string): Promise<T | null> {
   try {
+    const hashedKey = hashKey(key); // <-- 1. Gunakan hashKey di sini
+
     const cache = await prisma.driveCache.findUnique({
-      where: { key },
+      where: { key: hashedKey },     // <-- 2. Cari berdasarkan hash
     });
     if (cache && cache.expiresAt > new Date()) {
       console.log(`[DRIVE CACHE] Hit: ${key}`);
@@ -36,15 +43,17 @@ async function getCachedData<T>(key: string): Promise<T | null> {
 
 async function setCachedData(key: string, data: any, ttlSeconds: number = 3600): Promise<void> {
   try {
+    const hashedKey = hashKey(key); // <-- 3. Gunakan hashKey di sini
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+
     await prisma.driveCache.upsert({
-      where: { key },
+      where: { key: hashedKey },     // <-- 4. Cek berdasarkan hash
       update: {
         value: data,
         expiresAt,
       },
       create: {
-        key,
+        key: hashedKey,              // <-- 5. Simpan hash (panjangnya selalu 64 char)
         value: data,
         expiresAt,
       },
@@ -53,7 +62,6 @@ async function setCachedData(key: string, data: any, ttlSeconds: number = 3600):
     console.error("Cache Write Error:", e);
   }
 }
-
 async function getAccessToken(): Promise<string> {
   const cacheKey = "google_access_token";
   const cached = await getCachedData<string>(cacheKey);

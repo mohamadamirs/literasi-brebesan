@@ -9,7 +9,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // 1. BYPASS SEO & STATIC FILES
   const seoFiles = ["/sitemap.xml", "/robots.txt", "/favicon.ico"];
   if (
-    url.pathname.startsWith("/uploads/") ||
     seoFiles.some(
       (file) => url.pathname === file || url.pathname === file + "/",
     )

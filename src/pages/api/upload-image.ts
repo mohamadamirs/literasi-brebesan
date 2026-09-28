@@ -1,7 +1,5 @@
 import type { APIRoute } from 'astro';
 import { uploadToImageKit } from '@/shared/utils/imagekit';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE = 3 * 1024 * 1024; // 3MB
@@ -38,20 +36,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${extension}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Mode lokal (development) jika IMAGEKIT_PUBLIC_KEY tidak diatur
-    const isImageKitConfigured = !!(import.meta.env.IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_PUBLIC_KEY);
-
-    if (import.meta.env.DEV && !isImageKitConfigured) {
-      const uploadDir = join(process.cwd(), 'public', 'uploads', 'posts');
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(join(uploadDir, filename), buffer);
-      return new Response(JSON.stringify({ url: `/uploads/posts/${filename}` }), { status: 200 });
-    }
-
-    // Mode produksi: upload ke ImageKit
+    // Selalu upload ke ImageKit (baik dev maupun production)
     const now = new Date();
     const folder = `/literasibrebesan/posts/${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    
+
     const result = await uploadToImageKit(buffer, filename, folder);
 
     return new Response(JSON.stringify({ url: result.url }), { status: 200 });
