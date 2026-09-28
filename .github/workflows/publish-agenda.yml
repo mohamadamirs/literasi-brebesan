@@ -1,0 +1,35 @@
+name: Publish scheduled agenda
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-scheduled-agenda
+  cancel-in-progress: false
+
+jobs:
+  publish-agenda:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call agenda publishing endpoint
+        env:
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          : "${APP_BASE_URL:?Set APP_BASE_URL in repository variables}"
+          : "${CRON_SECRET:?Set CRON_SECRET in repository secrets}"
+          curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_BASE_URL%/}/api/cron/publish-agenda"

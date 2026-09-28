@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { uploadToImageKit } from '@/shared/utils/imagekit';
+import { imageFileExtension, validateImageFile } from '@/shared/utils/image-validation';
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE = 3 * 1024 * 1024; // 3MB
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -10,44 +10,42 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get('image') as File;
+  const contentLength = Number(request.headers.get('content-length'));
+  if (contentLength > MAX_SIZE + 64 * 1024) {
+    return new Response(JSON.stringify({ error: "Ukuran gambar terlalu besar." }), { status: 413 });
+  }
 
-  if (!file) {
+  const formData = await request.formData();
+  const candidate = formData.get('image');
+
+  if (!(candidate instanceof File)) {
     return new Response(JSON.stringify({ error: "No image file found" }), { status: 400 });
   }
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  const file = candidate;
+  if (!(await validateImageFile(file, MAX_SIZE))) {
     return new Response(
-      JSON.stringify({ error: "Format file tidak didukung. Gunakan JPG, PNG, atau WEBP." }),
-      { status: 400 }
-    );
-  }
-
-  if (file.size > MAX_SIZE) {
-    return new Response(
-      JSON.stringify({ error: "Ukuran gambar terlalu besar. Maksimal 3MB." }),
+      JSON.stringify({ error: "Gunakan gambar JPG, PNG, atau WEBP valid maksimal 3MB." }),
       { status: 400 }
     );
   }
 
   try {
-    const extension = file.name.split('.').pop() || 'jpg';
+    const extension = imageFileExtension(file.type);
     const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${extension}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // Selalu upload ke ImageKit (baik dev maupun production)
     const now = new Date();
-    const folder = `/literasibrebesan/posts/${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const folder = `/literasibrebesan/posts/${user.id}/${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const result = await uploadToImageKit(buffer, filename, folder);
 
     return new Response(JSON.stringify({ url: result.url }), { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Image upload error details:", error);
     return new Response(JSON.stringify({
       error: "Failed to upload image",
-      details: error.message || String(error)
     }), { status: 500 });
   }
 };

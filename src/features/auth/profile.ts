@@ -2,6 +2,7 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import prisma from "@/lib/prisma";
 import { uploadToImageKit, deleteFromImageKitByUrl } from "@/shared/utils/imagekit";
+import { imageFileExtension, validateImageFile } from "@/shared/utils/image-validation";
 import { authService } from "@/features/auth/auth.service";
 import bcrypt from "bcryptjs";
 
@@ -50,6 +51,9 @@ export const profileActions = {
     handler: async (input, context) => {
       const user = context.locals.user;
       if (!user) throw new ActionError({ code: "UNAUTHORIZED", message: "Silakan login." });
+      if (!(await validateImageFile(input.avatar))) {
+        throw new ActionError({ code: "BAD_REQUEST", message: "Gunakan gambar JPG, PNG, atau WEBP valid maksimal 3MB." });
+      }
 
       try {
         // Ambil data profil untuk hapus foto lama jika ada
@@ -59,22 +63,18 @@ export const profileActions = {
         });
         const oldAvatar = profile?.avatarUrl;
 
-        if (oldAvatar) {
-          try {
-            await deleteFromImageKitByUrl(oldAvatar);
-          } catch (delError) {
-            console.error("Gagal hapus avatar lama:", delError);
-          }
-        }
-
         const buffer = Buffer.from(await input.avatar.arrayBuffer());
-        const filename = `${user.id}-${Date.now()}-${input.avatar.name.replace(/[^a-zA-Z0-9.-]/g, "")}`;
-        const blob = await uploadToImageKit(buffer, filename, "/literasibrebesan/avatars");
+        const filename = `${user.id}-${Date.now()}.${imageFileExtension(input.avatar.type)}`;
+        const blob = await uploadToImageKit(buffer, filename, `/literasibrebesan/avatars/${user.id}`);
 
         await prisma.profile.update({
           where: { id: user.id },
           data: { avatarUrl: blob.url },
         });
+
+        if (oldAvatar) {
+          await deleteFromImageKitByUrl(oldAvatar, `literasibrebesan/avatars/${user.id}`);
+        }
 
         return { success: true, url: blob.url };
       } catch (e: any) {

@@ -1,6 +1,7 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro:schema";
 import { uploadToImageKit, deleteFromImageKitByUrl } from "@/shared/utils/imagekit";
+import { imageFileExtension, validateImageFile } from "@/shared/utils/image-validation";
 import { agendaService } from "@/features/agenda/agenda.service";
 
 export const agendaActions = {
@@ -30,6 +31,13 @@ export const agendaActions = {
         });
       }
 
+      if (input.poster && input.poster.size > 0 && !(await validateImageFile(input.poster))) {
+        throw new ActionError({
+          code: "BAD_REQUEST",
+          message: "Gunakan gambar JPG, PNG, atau WEBP valid maksimal 3MB.",
+        });
+      }
+
       let imageUrl: string | null = null;
       if (input.poster && input.poster.size > 0) {
         try {
@@ -38,7 +46,7 @@ export const agendaActions = {
             const oldImageUrl = await agendaService.getAgendaImageUrl(input.id);
             if (oldImageUrl) {
               try {
-                await deleteFromImageKitByUrl(oldImageUrl);
+                await deleteFromImageKitByUrl(oldImageUrl, "literasibrebesan/agenda-posters");
               } catch (delError) {
                 console.error("Gagal menghapus gambar agenda lama:", delError);
               }
@@ -46,7 +54,7 @@ export const agendaActions = {
           }
 
           const buffer = Buffer.from(await input.poster.arrayBuffer());
-          const filename = `${Date.now()}-${input.poster.name.replace(/[^a-zA-Z0-9.-]/g, "")}`;
+          const filename = `${Date.now()}.${imageFileExtension(input.poster.type)}`;
           const blob = await uploadToImageKit(
             buffer,
             filename,
@@ -112,7 +120,7 @@ export const agendaActions = {
         const oldImageUrl = await agendaService.getAgendaImageUrl(id);
         if (oldImageUrl) {
           try {
-            await deleteFromImageKitByUrl(oldImageUrl);
+            await deleteFromImageKitByUrl(oldImageUrl, "literasibrebesan/agenda-posters");
           } catch (delError) {
             console.error("Gagal menghapus gambar saat delete agenda:", delError);
           }

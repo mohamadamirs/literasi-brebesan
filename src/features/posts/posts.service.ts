@@ -19,6 +19,17 @@ export const sanitizeOptions = {
   allowedSchemes: ["http", "https", "data"],
 };
 
+function deletePostImages(content: string | null, authorId: string): void {
+  const imageRegex = /<img[^>]+src="([^">]+)"/g;
+  let match;
+  while ((match = imageRegex.exec(content || "")) !== null) {
+    void deleteFromImageKitByUrl(
+      match[1],
+      `literasibrebesan/posts/${authorId}`,
+    ).catch(() => {});
+  }
+}
+
 export interface GetPublishedPostsParams {
   limit?: number;
   offset?: number;
@@ -257,15 +268,7 @@ export const postsService = {
       });
       if (!userPost) return { success: false };
 
-      if (userPost.content) {
-        const imgRegex = /<img[^>]+src="([^">]+)"/g;
-        let match;
-        while ((match = imgRegex.exec(userPost.content)) !== null) {
-          if (match[1].includes("ik.imagekit.io")) {
-            deleteFromImageKitByUrl(match[1]).catch(() => {});
-          }
-        }
-      }
+      deletePostImages(userPost.content, userId);
       
       await prisma.post.deleteMany({
         where: { id, userId },
@@ -275,20 +278,12 @@ export const postsService = {
 
     const postToDelete = await prisma.post.findUnique({
       where: { id },
-      select: { content: true },
+      select: { content: true, userId: true },
     });
 
     if (!postToDelete) return { success: false };
 
-    if (postToDelete.content) {
-      const imgRegex = /<img[^>]+src="([^">]+)"/g;
-      let match;
-      while ((match = imgRegex.exec(postToDelete.content)) !== null) {
-        if (match[1].includes("ik.imagekit.io")) {
-          deleteFromImageKitByUrl(match[1]).catch(() => {});
-        }
-      }
-    }
+    deletePostImages(postToDelete.content, postToDelete.userId);
 
     await prisma.post.delete({ where: { id } });
     return { success: true };

@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/publish-agenda",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
+{}

@@ -30,7 +30,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
         fullName: (payload.fullName as string) || "User",
         avatarUrl: (payload.avatarUrl as string) || undefined,
       };
-    } catch (e: any) {
+    } catch {
       // Access token expired atau invalid, lanjut ke Jalur Refresh
       cookies.delete("access_token", { path: "/" });
     }
@@ -70,6 +70,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
       cookies.delete("refresh_token", { path: "/" });
       return redirect("/login?error=unauthorized");
     }
+  }
+
+  if (url.pathname.startsWith("/user") && userData?.role === "admin") {
+    return redirect("/admin");
   }
 
   // LOGIKA TENDANG STANDAR

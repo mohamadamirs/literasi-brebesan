@@ -1,5 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { MemoryRateLimiter, getClientIp } from "./rate-limiter";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/prisma", () => ({ default: mockPrisma, prisma: mockPrisma }));
+
+import { DatabaseRateLimiter, MemoryRateLimiter, getClientIp } from "./rate-limiter";
 
 describe("MemoryRateLimiter", () => {
   let limiter: MemoryRateLimiter;
@@ -58,30 +68,78 @@ describe("MemoryRateLimiter", () => {
 });
 
 describe("getClientIp", () => {
-  it("harus mendeteksi IP dari cf-connecting-ip jika ada", () => {
+  it("harus mendahulukan alamat client dari adapter", () => {
     const req = new Request("http://localhost", {
       headers: { "cf-connecting-ip": "203.0.113.195" },
     });
-    expect(getClientIp(req, "127.0.0.1")).toBe("203.0.113.195");
+    expect(getClientIp(req, "192.0.2.10")).toBe("192.0.2.10");
+  });
+
+  it("menggunakan header proxy hanya jika alamat adapter tidak tersedia", () => {
+    const req = new Request("http://localhost", {
+      headers: { "cf-connecting-ip": "203.0.113.195" },
+    });
+    expect(getClientIp(req)).toBe("203.0.113.195");
   });
 
   it("harus mendeteksi IP pertama dari x-forwarded-for jika ada", () => {
     const req = new Request("http://localhost", {
       headers: { "x-forwarded-for": "198.51.100.1, 10.0.0.1" },
     });
-    expect(getClientIp(req, "127.0.0.1")).toBe("198.51.100.1");
+    expect(getClientIp(req)).toBe("198.51.100.1");
   });
 
   it("harus mendeteksi IP dari x-real-ip jika ada", () => {
     const req = new Request("http://localhost", {
       headers: { "x-real-ip": "198.51.100.25" },
     });
-    expect(getClientIp(req, "127.0.0.1")).toBe("198.51.100.25");
+    expect(getClientIp(req)).toBe("198.51.100.25");
   });
 
   it("harus fallback ke clientAddress atau 127.0.0.1", () => {
     const req = new Request("http://localhost");
     expect(getClientIp(req, "192.168.1.10")).toBe("192.168.1.10");
     expect(getClientIp(undefined, undefined)).toBe("127.0.0.1");
+  });
+});
+
+describe("DatabaseRateLimiter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    mockPrisma.$executeRaw.mockResolvedValue(1);
+  });
+
+  it("mencatat percobaan pada storage bersama", async () => {
+    mockPrisma.$queryRaw.mockResolvedValueOnce([
+      { count: 1, resetTime: new Date(Date.now() + 60000) },
+    ]);
+
+    const limiter = new DatabaseRateLimiter();
+    const result = await limiter.check("signin:203.0.113.10", {
+      max: 3,
+      windowMs: 60000,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.remaining).toBe(2);
+    expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("menolak percobaan ketika counter bersama telah mencapai batas", async () => {
+    mockPrisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    mockPrisma.$queryRaw.mockResolvedValueOnce([
+      { count: 3, resetTime: new Date(Date.now() + 60000) },
+    ]);
+
+    const limiter = new DatabaseRateLimiter();
+    const result = await limiter.check("signin:203.0.113.10", {
+      max: 3,
+      windowMs: 60000,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.remaining).toBe(0);
   });
 });

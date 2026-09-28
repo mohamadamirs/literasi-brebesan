@@ -1,7 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { authActions } from "./auth";
-import { rateLimiter } from "@/shared/utils/rate-limiter";
-import { ActionError } from "astro:actions";
+
+const { mockRateLimiter } = vi.hoisted(() => {
+  const store = new Map<string, { count: number; resetTime: number }>();
+  return {
+    mockRateLimiter: {
+      check: vi.fn((key: string, options: { max: number; windowMs: number }) => {
+        const now = Date.now();
+        let record = store.get(key);
+        if (!record || now >= record.resetTime) {
+          record = { count: 0, resetTime: now + options.windowMs };
+          store.set(key, record);
+        }
+        if (record.count >= options.max) {
+          return {
+            success: false,
+            remaining: 0,
+            resetTime: record.resetTime,
+            retryAfterSeconds: Math.ceil((record.resetTime - now) / 1000),
+          };
+        }
+        record.count += 1;
+        return {
+          success: true,
+          remaining: options.max - record.count,
+          resetTime: record.resetTime,
+          retryAfterSeconds: Math.ceil((record.resetTime - now) / 1000),
+        };
+      }),
+      reset: vi.fn((key: string) => store.delete(key)),
+      clear: vi.fn(() => store.clear()),
+    },
+  };
+});
+
+vi.mock("@/shared/utils/rate-limiter", () => ({
+  rateLimiter: mockRateLimiter,
+  getClientIp: (_request: Request, clientAddress?: string) =>
+    clientAddress || "127.0.0.1",
+}));
 
 vi.mock("@/features/auth/auth.service", () => ({
   authService: {
@@ -17,9 +53,12 @@ vi.mock("@/features/auth/auth.service", () => ({
   },
 }));
 
+import { authActions } from "./auth";
+import { ActionError } from "astro:actions";
+
 describe("authActions rate limiting", () => {
   beforeEach(() => {
-    rateLimiter.clear();
+    mockRateLimiter.clear();
     vi.clearAllMocks();
   });
 

@@ -5,6 +5,12 @@ import { authService } from "@/features/auth/auth.service";
 import { Resend } from "resend";
 import { rateLimiter, getClientIp } from "@/shared/utils/rate-limiter";
 
+const publicSiteUrl =
+  import.meta.env.PUBLIC_SITE_URL ||
+  process.env.PUBLIC_SITE_URL ||
+  "https://literasibrebesan.my.id";
+const publicSiteOrigin = new URL(publicSiteUrl).origin;
+
 export const authActions = {
   signIn: defineAction({
     accept: "form",
@@ -14,7 +20,7 @@ export const authActions = {
     }),
     handler: async (input, context) => {
       const ip = getClientIp(context.request, context.clientAddress);
-      const rl = rateLimiter.check(`signin:${ip}`, {
+      const rl = await rateLimiter.check(`signin:${ip}`, {
         max: 10,
         windowMs: 15 * 60 * 1000,
       });
@@ -31,7 +37,7 @@ export const authActions = {
           await authService.authenticateUser(input);
 
         // Reset rate limiter setelah login berhasil
-        rateLimiter.reset(`signin:${ip}`);
+        await rateLimiter.reset(`signin:${ip}`);
 
         context.cookies.set("access_token", accessToken, {
           path: "/",
@@ -78,7 +84,7 @@ export const authActions = {
     }),
     handler: async (input, context) => {
       const ip = getClientIp(context.request, context.clientAddress);
-      const rl = rateLimiter.check(`register:${ip}`, {
+      const rl = await rateLimiter.check(`register:${ip}`, {
         max: 5,
         windowMs: 60 * 60 * 1000, // 1 jam
       });
@@ -139,11 +145,11 @@ export const authActions = {
     }),
     handler: async (input, context) => {
       const ip = getClientIp(context.request, context.clientAddress);
-      const ipRl = rateLimiter.check(`forgot-ip:${ip}`, {
+      const ipRl = await rateLimiter.check(`forgot-ip:${ip}`, {
         max: 5,
         windowMs: 30 * 60 * 1000,
       });
-      const emailRl = rateLimiter.check(
+      const emailRl = await rateLimiter.check(
         `forgot-email:${input.email.toLowerCase()}`,
         {
           max: 3,
@@ -177,15 +183,7 @@ export const authActions = {
         }
 
         const resend = new Resend(resendApiKey);
-        const protocol =
-          context.request.headers.get("x-forwarded-proto") ||
-          context.url.protocol.replace(":", "");
-        const host =
-          context.request.headers.get("x-forwarded-host") ||
-          context.request.headers.get("host") ||
-          context.url.host;
-        const origin = `${protocol}://${host}`;
-        const resetUrl = `${origin}/reset-password?token=${token}`;
+        const resetUrl = `${publicSiteOrigin}/reset-password?token=${token}`;
         const senderEmail =
           import.meta.env.RESEND_FROM_EMAIL ||
           process.env.RESEND_FROM_EMAIL ||
@@ -243,7 +241,7 @@ export const authActions = {
       }),
     handler: async (input, context) => {
       const ip = getClientIp(context?.request, context?.clientAddress);
-      const rl = rateLimiter.check(`reset-pwd:${ip}`, {
+      const rl = await rateLimiter.check(`reset-pwd:${ip}`, {
         max: 10,
         windowMs: 15 * 60 * 1000,
       });
