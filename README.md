@@ -165,7 +165,7 @@ Lihat [`.env.example`](.env.example) untuk template lengkap.
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_PRIVATE_KEY` / `GOOGLE_DRIVE_ROOT_FOLDER_ID` | Arsip dokumentasi Drive |
 | `CRON_SECRET` | Proteksi endpoint `/api/cron/*` |
 
-> Catatan: `package.json` dan `prisma/schema.prisma` memakai **`DATABASE_URL` (MySQL/TiDB)**. Beberapa referensi `POSTGRES_URL` lama di `.env.example` sudah tidak dipakai.
+> Catatan: `package.json` dan `prisma/schema.prisma` memakai **`DATABASE_URL` (MySQL/TiDB)** — variabel `POSTGRES_URL` tidak lagi dipakai.
 
 ## 9. Perintah Operasional
 

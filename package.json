@@ -24,7 +24,6 @@
     "bcryptjs": "^3.0.3",
     "imagekit": "^6.0.0",
     "jose": "^6.2.2",
-    "marked": "^17.0.5",
     "preact": "^10.29.1",
     "resend": "^6.10.0",
     "sanitize-html": "^2.14.0",
