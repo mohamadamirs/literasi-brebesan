@@ -103,8 +103,9 @@ if (result && !result.error) {
         </div>
       </div>
 
-      <button type="submit" class="w-full bg-slate-900 text-white font-black py-5 md:py-6 rounded-[2rem] hover:bg-black transition-all shadow-xl shadow-slate-200 uppercase tracking-widest text-[11px] md:text-xs active:scale-95 mt-4 md:mt-8 cursor-pointer">
-        Simpan Agenda
+      <button type="submit" id="submit-btn" class="w-full bg-slate-900 text-white font-black py-5 md:py-6 rounded-[2rem] hover:bg-black transition-all shadow-xl shadow-slate-200 uppercase tracking-widest text-[11px] md:text-xs active:scale-95 mt-4 md:mt-8 cursor-pointer">
+        <span id="btn-text">Simpan Agenda</span>
+        <span id="loading-spinner" class="hidden">Menyimpan...</span>
       </button>
 
       {result?.error && (
@@ -180,11 +181,5 @@ if (result && !result.error) {
       btnText?.classList.add('hidden');
       spinner?.classList.remove('hidden');
     });
-  });
-</script>d?.addEventListener('change', handleStatusChange);
-
-      // Eksekusi sekali saat pertama kali halaman dibuka
-      handleStatusChange();
-    }
   });
 </script>
