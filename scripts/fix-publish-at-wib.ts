@@ -34,8 +34,10 @@ loadEnv();
  * Sebelum fix, admin mengisi `10:00` (WIB) di <input type="datetime-local">
  * dan nilainya disimpan apa adanya sebagai 10:00 UTC. Setelah fix, nilai itu
  * dibaca sebagai UTC, jadi jam yang tampil di form edit bergeser +7 jam.
- * Skrip ini menambah 7 jam ke SEMUA `agendas.publish_at` yang sudah ada,
- * supaya jadwal hasil input lama tetap tayang pada jam yang dimaksud admin.
+ * Skrip ini menambah 7 jam ke `agendas.publish_at` **hanya untuk status
+ * `scheduled`** — satu-satunya jalur yang memakai input datetime-local
+ * tersebut. Agenda `published` dari tombol publish memakai `new Date()`
+ * sehingga nilainya sudah UTC yang benar dan tidak boleh digeser.
  *
  * Idempoten: penanda hasil migrasi disimpan di tabel `drive_cache`.
  *
@@ -46,6 +48,11 @@ loadEnv();
  * Pemakaian:
  *   npm run fix:publish-at-wib              # dry-run (hanya menampilkan data)
  *   npm run fix:publish-at-wib -- --apply    # geser +7 jam + tulis penanda
+ *
+ * Catatan: agenda yang dulu `scheduled` lalu sudah dipublikasikan otomatis oleh
+ * cron ikut menyimpan publish_at warisan jadwal (statusnya kini `published`),
+ * jadi tidak tersentuh skrip ini. Jumlahnya biasanya nol; koreksi manual bila
+ * tanggal tayangnya terlihat bergeser 7 jam.
  */
 
 const MARKER_KEY = "migration:publish-at-wib-v1";
@@ -64,20 +71,31 @@ async function main() {
     return;
   }
 
+  // Hanya status `scheduled` yang publish_at-nya berasal dari input
+  // <input type="datetime-local"> (jalur yang terkena bug A3). Status lain
+  // memakai `new Date()` saat dipublikasikan, jadi nilainya sudah UTC yang
+  // benar dan TIDAK boleh digeser.
+  //   - `published` via form  → publishAt = waktu klik "publish" (benar)
+  //   - `published` via cron  → publishAt = warisan jadwal (ikut tergeser
+  //     bila jadwalnya dibuat sebelum fix; baris seperti ini tidak bisa
+  //     dibedakan otomatis, koreksi manual bila perlu)
   const rows = await prisma.agenda.findMany({
     where: { publishAt: { not: null } },
     select: { id: true, title: true, status: true, publishAt: true },
     orderBy: { publishAt: "asc" },
   });
+  const targets = rows.filter((row) => row.status === "scheduled");
 
   console.log(`Ditemukan ${rows.length} agenda dengan publish_at:`);
   for (const row of rows) {
+    const willShift = row.status === "scheduled";
     console.log(
-      `  - [${row.status}] ${row.title} → ${row.publishAt?.toISOString()}`,
+      `  - [${row.status}] ${row.title} → ${row.publishAt?.toISOString()}` +
+        ` (${willShift ? "DIGESER +7 jam" : "dilewati"})`,
     );
   }
 
-  if (rows.length === 0) {
+  if (targets.length === 0) {
     if (apply) {
       await prisma.driveCache.create({
         data: {
@@ -86,16 +104,18 @@ async function main() {
           expiresAt: new Date("2099-12-31T00:00:00.000Z"),
         },
       });
-      console.log(`\n✅ Tidak ada data. Penanda "${MARKER_KEY}" tetap ditulis.`);
+      console.log(
+        `\n✅ Tidak ada agenda berstatus "scheduled". Penanda "${MARKER_KEY}" tetap ditulis.`,
+      );
     } else {
-      console.log("\nTidak ada data untuk dimigrasikan.");
+      console.log('\nTidak ada agenda berstatus "scheduled" untuk dimigrasikan.');
     }
     return;
   }
 
   if (!apply) {
     console.log(
-      "\nDRY-RUN: belum ada perubahan. Jalankan dengan --apply untuk menggeser +7 jam.",
+      `\nDRY-RUN: ${targets.length} agenda akan digeser +7 jam. Jalankan dengan --apply.`,
     );
     return;
   }
@@ -104,7 +124,7 @@ async function main() {
   const shifted = await prisma.$executeRaw`
     UPDATE agendas
     SET publish_at = publish_at + INTERVAL 7 HOUR
-    WHERE publish_at IS NOT NULL
+    WHERE publish_at IS NOT NULL AND status = 'scheduled'
   `;
 
   await prisma.driveCache.create({
