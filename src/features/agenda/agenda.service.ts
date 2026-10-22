@@ -33,7 +33,65 @@ export interface UpdateAgendaData extends CreateAgendaData {
   id: string;
 }
 
+export type PromoteDueAgendaResult =
+  /** Agenda due berhasil ditayangkan. */
+  | "published"
+  /** Tidak ada agenda `scheduled` yang sudah jatuh tempo. */
+  | "none"
+  /** Ada publikasi yang lebih baru (mis. admin publish manual) → tidak ditimpa. */
+  | "superseded"
+  /** Agenda sudah diklaim pemanggil lain (cron/request paralel). */
+  | "claimed";
+
 export const agendaService = {
+  /**
+   * Promosikan agenda `scheduled` yang sudah jatuh tempo menjadi `published`.
+   *
+   * Dipakai dua jalur supaya `publish_at` benar-benar tayang pada waktunya:
+   * - cron harian `/api/cron/publish-agenda` (jalur utama, tanpa butuh trafik);
+   * - pembacaan agenda publik `/api/agendas` (pemicu tepat waktu), karena cron
+   *   Vercel plan Hobby hanya boleh berjalan sekali sehari sehingga agenda
+   *   terjadwal bisa telat sampai ~1 hari.
+   *
+   * Satu agenda per pemanggilan (yang publish_at-nya paling awal) supaya
+   * agenda tertua tidak dilewati. Publikasi yang lebih baru tidak ditimpa.
+   */
+  async promoteDueAgenda(): Promise<PromoteDueAgendaResult> {
+    const now = new Date();
+    const due = await prisma.agenda.findFirst({
+      where: { status: "scheduled", publishAt: { lte: now } },
+      orderBy: { publishAt: "asc" },
+    });
+    if (!due) return "none";
+
+    const live = await prisma.agenda.findFirst({
+      where: { status: "published" },
+      select: { publishAt: true },
+    });
+    if (live?.publishAt && due.publishAt && live.publishAt >= due.publishAt) {
+      return "superseded";
+    }
+
+    const published = await prisma.$transaction(async (tx) => {
+      // Claim dulu (optimistic lock): dua pemanggil paralel tidak boleh
+      // mempublikasikan agenda yang sama.
+      const claim = await tx.agenda.updateMany({
+        where: { id: due.id, status: "scheduled", publishAt: { lte: now } },
+        data: { status: "published" },
+      });
+      if (claim.count === 0) return false;
+
+      // Invariant: hanya satu agenda yang published. Sisanya diarsipkan.
+      await tx.agenda.updateMany({
+        where: { status: "published", id: { not: due.id } },
+        data: { status: "archived" },
+      });
+      return true;
+    });
+
+    return published ? "published" : "claimed";
+  },
+
   async getUpcomingAgendas(limit: number = 1): Promise<AgendaItem[]> {
     // Hanya agenda berstatus "published" yang tayang di publik. Filter
     // eventDate >= today pernah membuat agenda yang sudah tayang (tanggal
@@ -247,7 +305,7 @@ export const agendaService = {
     });
     await prisma.agenda.update({
       where: { id },
-      data: { status: "published", publishAt: null },
+      data: { status: "published", publishAt: new Date() },
     });
     return { success: true };
   },
