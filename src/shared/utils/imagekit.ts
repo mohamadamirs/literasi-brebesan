@@ -73,22 +73,30 @@ export async function deleteFromImageKitByUrl(
     if (!urlEndpoint) return;
 
     const endpoint = new URL(urlEndpoint);
-    const endpointPath = endpoint.pathname.replace(/\/+$/, "");
     const folderPath = allowedFolder.replace(/^\/+|\/+$/g, "");
-    const applicationPath = `${endpointPath}/${folderPath}/`;
+    const rawFileName = urlObj.pathname.split("/").pop() || "";
+    if (!rawFileName || !/^[a-zA-Z0-9._%-]+$/.test(rawFileName)) return;
+
+    // Folder whitelist: file harus berada LANGSUNG di folder yang diizinkan.
+    // Path dicek dari URL, bukan dari URL endpoint, karena endpoint bisa saja
+    // sudah memuat segmen folder (mis. https://ik.imagekit.io/literasibrebesan).
+    const allowedPrefix = `/${folderPath}/`;
     if (
       urlObj.origin !== endpoint.origin ||
-      !urlObj.pathname.startsWith(applicationPath)
+      !urlObj.pathname.endsWith(`${allowedPrefix}${rawFileName}`)
     ) {
       return;
     }
 
-    const fileName = decodeURIComponent(urlObj.pathname.split("/").pop() || "");
-
-    if (!fileName || !/^[a-zA-Z0-9._-]+$/.test(fileName)) return;
+    const fileName = decodeURIComponent(rawFileName);
 
     const files = await ik.listFiles({
+      // Batasi ke folder yang diizinkan + limit eksplisit: tanpa ini file dengan
+      // nama sama di folder lain bisa memenuhi hasil, dan limit default bisa
+      // memotong file yang sebenarnya mau dihapus (storage leak).
+      path: `/${folderPath}`,
       searchQuery: `name="${fileName}"`,
+      limit: 1000,
     });
     const matchingFile = files.find((file) => {
       try {
