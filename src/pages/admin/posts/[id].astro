@@ -2,6 +2,7 @@
 import DashboardLayout from "@/shared/layouts/DashboardLayout.astro";
 import prisma from "@/lib/prisma";
 import { actions } from "astro:actions";
+import { sanitizeContent } from "@/features/posts/sanitize";
 
 const { user } = Astro.locals;
 // Keamanan: Hanya admin yang bisa masuk
@@ -78,7 +79,7 @@ const formatDate = (date: any) => {
         Penulis: <span class="text-slate-900">{post.author_name || 'Anonim'}</span>
       </p>
 
-      <article class="prose prose-slate prose-sm sm:prose-base max-w-full w-full break-words prose-headings:font-black prose-a:text-blue-600 prose-p:leading-relaxed overflow-x-hidden" set:html={post.content}>
+      <article class="prose prose-slate prose-sm sm:prose-base max-w-full w-full break-words prose-headings:font-black prose-a:text-blue-600 prose-p:leading-relaxed overflow-x-hidden" set:html={sanitizeContent(post.content)}>
       </article>
     </div>
 
