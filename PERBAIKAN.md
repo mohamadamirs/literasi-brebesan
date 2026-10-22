@@ -72,11 +72,9 @@ bukti runtime/DB.
 
 ## D2. Verifikasi Production (2026-10-22)
 
-Konfirmasi pemilik: environment variable sudah terpasang di Vercel (`DATABASE_URL`, `AUTH_SECRET`, `IMAGEKIT_*`, `RESEND_*`, `GOOGLE_*`) — **kecuali `CRON_SECRET` yang ternyata belum ada** (endpoint 401 tidak membuktikan secret terpasang: `verifyCronRequest` fail-closed mengembalikan 401 yang sama saat secret kosong maupun salah).
+Konfirmasi pemilik: environment variable sudah terpasang di Vercel (`DATABASE_URL`, `AUTH_SECRET`, `IMAGEKIT_*`, `RESEND_*`, `GOOGLE_*`, **`CRON_SECRET`**). Catatan: 401 dari `/api/cron/*` **tidak** membuktikan secret terpasang — `verifyCronRequest` fail-closed mengembalikan 401 yang sama saat secret kosong maupun salah.
 
-Tindakan 2026-10-22: secret baru dibuat (`openssl rand -base64 32`) dan dipasang:
-- GitHub repository secret `CRON_SECRET` (aman untuk repo publik — terenkripsi, tidak terbaca publik/fork) — sudah aktif.
-- Vercel project env `CRON_SECRET` — **perlu dipasang manual via dashboard/CLI**, lalu redeploy. Nilai sama dengan yang di GitHub secret.
+Tindakan 2026-10-22: `CRON_SECRET` GitHub repository secret dibuat (nilai acak) sebagai fallback workflow cron. Karena nilainya berbeda dari `CRON_SECRET` di Vercel, nilainya harus **disinkronkan manual** (lihat §D2 "Tindak lanjut") agar fallback GitHub Actions tidak mendapat 401. Jalur utama (cron bawaan Vercel via `vercel.json`) tidak terpengaruh.
 
 | Cek (kode yang sekarang live, sebelum PR ini) | Hasil | Catatan |
 | :-- | :-- | :-- |
@@ -91,6 +89,20 @@ Tindakan 2026-10-22: secret baru dibuat (`openssl rand -base64 32`) dan dipasang
 | `GET /api/agendas` | 200 `null` | By design: tidak ada agenda `published` saat ini (`agendas[0] \|\| null`) |
 
 Catatan: perilaku fix di PR ini baru bisa diverifikasi di production setelah merge + deploy.
+
+### Tindak lanjut: sinkronkan `CRON_SECRET` GitHub ↔ Vercel
+
+1. Ambil nilai `CRON_SECRET` dari Vercel Dashboard → Project → Settings → Environment Variables.
+2. Simpan sebagai GitHub repository secret dengan nilai **yang sama**:
+   ```bash
+   gh secret set CRON_SECRET      # paste nilai dari Vercel
+   ```
+3. Cek jalannya fallback:
+   ```bash
+   curl -i -H "Authorization: Bearer <nilai>" \
+     https://literasibrebesan.my.id/api/cron/publish-agenda   # harus 200, bukan 401
+   ```
+   Workflow GitHub Actions otomatis memakai secret yang sama + repository variable `APP_BASE_URL`.
 
 ---
 
