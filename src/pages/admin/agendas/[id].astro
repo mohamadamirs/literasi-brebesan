@@ -16,7 +16,6 @@ if (!agenda) return Astro.redirect('/admin');
 
 // Cek apakah ada agenda LAIN yang statusnya published
 const conflict = await agendaService.checkPublishedConflict(id);
-const hasConflict = !!conflict;
 
 const result = Astro.getActionResult(actions.saveAgenda);
 if (result && !result.error) return Astro.redirect('/admin');
@@ -29,12 +28,12 @@ if (result && !result.error) return Astro.redirect('/admin');
       <h1 class="text-3xl font-black uppercase text-slate-900 mt-2 leading-none">Edit Agenda</h1>
     </header>
 
-    {hasConflict && (
+    {conflict && (
       <div class="mb-8 p-5 bg-rose-50 border-2 border-rose-100 rounded-[2rem] flex items-center gap-4 overflow-hidden">
         <div class="w-10 h-10 bg-rose-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-200">!</div>
         <div class="min-w-0 flex-1">
           <p class="text-[11px] font-black uppercase text-rose-500 tracking-widest">Peringatan Penting</p>
-          <p class="text-xs font-bold text-rose-900 leading-tight break-words">Agenda <span class="underline">"{conflict[0].title}"</span> sedang tayang. Ubah agenda tersebut ke Draft jika ingin menerbitkan yang ini.</p>
+          <p class="text-xs font-bold text-rose-900 leading-tight break-words">Agenda <span class="underline">"{conflict.title}"</span> sedang tayang. Ubah agenda tersebut ke Draft jika ingin menerbitkan yang ini.</p>
         </div>
       </div>
     )}
