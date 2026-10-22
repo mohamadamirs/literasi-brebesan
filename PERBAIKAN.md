@@ -5,7 +5,7 @@ Dokumen ini berisi daftar error faktual yang ditemukan pada audit kode Literasi 
 
 - Audit: 2026-10-22
 - Branch: `fix/audit-critical-fixes`
-- Verifikasi: `vitest run` (15 file / 108 test) + `astro build` (sukses) + probe test per temuan
+- Verifikasi: `vitest run` (15 file / 114 test) + `astro build` (sukses) + probe test per temuan
 
 Status enum: `SELESAI` = sudah diperbaiki & di-commit · `PROSES` = sedang dikerjakan ·
 `TERJADI` = terkonfirmasi ada, belum diperbaiki · `PERLU-VERIFIKASI` = indikasi kuat, perlu
@@ -42,7 +42,7 @@ bukti runtime/DB.
 | B7 | MEDIUM | `set:html={post.content}` tanpa sanitasi ulang saat render (`publikasi/[slug].astro`, `admin/posts/[id].astro`). Aman selama write-path sanitize, tapi `scripts/sync-db-imagekit.ts:128` menulis `content` tanpa sanitize. | SELESAI | cef225c |
 | B8 | MEDIUM | `security.checkOrigin: false` di `astro.config.mjs` → proteksi CSRF Astro dimatikan; hanya tertahan SameSite=Lax cookie. | SELESAI | f409ca0 |
 | B9 | LOW | `api/posts.ts` tidak validasi `limit`/`offset` → `parseInt("abc")` = NaN → Prisma error 500; `limit` tanpa batas maksimum. | SELESAI | 11ce7c2 |
-| B10 | LOW | `posts.service.updatePost`/`deletePost` non-admin memakai `updateMany`/`deleteMany` tanpa cek `count` → UI menampilkan "sukses" padahal 0 baris berubah. | SELESAI | 961c5ca |
+| B10 | LOW | `posts.service.updatePost`/`deletePost` non-admin memakai `updateMany`/`deleteMany` tanpa cek `count` → UI menampilkan "sukses" padahal 0 baris berubah. Cek `count` di service baru berefek setelah action-nya diperbaiki di **R2**. | SELESAI | 961c5ca |
 | B11 | LOW | `auth.service.updateUser` tidak cek email duplikat → Prisma P2002 → 500 generik. | SELESAI | ec8e8a7 |
 | B12 | LOW | Dependency `marked` dan `sharp` tidak pernah di-import (dead dependency). | SELESAI | ff8cea7 |
 | B13 | MEDIUM | `drive_cache` dipakai dua fungsi (cache Drive + rate limiter prefix `rl:`); cleanup `DELETE ... LIMIT 500` — kompatibilitas TiDB belum diverifikasi. | SELESAI | 0abfa62 |
@@ -74,7 +74,9 @@ bukti runtime/DB.
 
 Catatan: 401 dari `/api/cron/*` **tidak** membuktikan secret terpasang — `verifyCronRequest` fail-closed mengembalikan 401 yang sama saat secret kosong maupun salah.
 
-Status cron: `CRON_SECRET` **sudah ada** di Vercel project env. Jalur cron tunggal = cron bawaan Vercel lewat `vercel.json` (publish-agenda harian 00:00 UTC, cleanup-sessions 03:00 UTC). Fallback GitHub Actions dihapus (2026-10-22) beserta repository secret `CRON_SECRET` & variable `APP_BASE_URL` — tidak ada lagi nilai secret yang harus disinkronkan antar dua tempat. Konsekuensi: agenda `scheduled` tayang paling lambat ±1 hari (harian), jadi admin sebaiknya mengatur `publish_at` minimal H-1.
+Status cron: `CRON_SECRET` **sudah ada** di Vercel project env. Jalur cron tunggal = cron bawaan Vercel lewat `vercel.json` (publish-agenda harian 00:00 UTC, cleanup-sessions 03:00 UTC). Fallback GitHub Actions dihapus (2026-10-22) beserta repository secret `CRON_SECRET` & variable `APP_BASE_URL` — tidak ada lagi nilai secret yang harus disinkronkan antar dua tempat.
+
+Konsekuensi jadwal harian **sudah ditutup** oleh temuan **R4** (`062bf5e`): `GET /api/agendas` ikut memicu `agendaService.promoteDueAgenda()`, jadi agenda `scheduled` tayang pada pembacaan publik pertama setelah `publish_at` lewat (cron harian tinggal menjadi jaring pengaman bila tidak ada trafik). Presisi tayang jadi beberapa detik, bukan ±1 hari.
 
 | Cek (kode yang sekarang live, sebelum PR ini) | Hasil | Catatan |
 | :-- | :-- | :-- |
@@ -90,19 +92,12 @@ Status cron: `CRON_SECRET` **sudah ada** di Vercel project env. Jalur cron tungg
 
 Catatan: perilaku fix di PR ini baru bisa diverifikasi di production setelah merge + deploy.
 
-### Tindak lanjut: sinkronkan `CRON_SECRET` GitHub ↔ Vercel
+### Menjalankan cron manual (tanpa GitHub Actions)
 
-1. Ambil nilai `CRON_SECRET` dari Vercel Dashboard → Project → Settings → Environment Variables.
-2. Simpan sebagai GitHub repository secret dengan nilai **yang sama**:
-   ```bash
-   gh secret set CRON_SECRET      # paste nilai dari Vercel
-   ```
-3. Cek jalannya fallback:
-   ```bash
-   curl -i -H "Authorization: Bearer <nilai>" \
-     https://literasibrebesan.my.id/api/cron/publish-agenda   # harus 200, bukan 401
-   ```
-   Workflow GitHub Actions otomatis memakai secret yang sama + repository variable `APP_BASE_URL`.
+```bash
+curl -i -H "Authorization: Bearer <CRON_SECRET dari Vercel env>" \
+  https://literasibrebesan.my.id/api/cron/publish-agenda   # harus 200, bukan 401
+```
 
 ---
 
@@ -112,6 +107,7 @@ Catatan: perilaku fix di PR ini baru bisa diverifikasi di production setelah mer
 - **Tetap dipertahankan:** link WhatsApp sosial di `CONTACT_INFO.whatsapp` (`wa.me/...`) dan tombol share WhatsApp di halaman artikel — itu tautan kontak, bukan integrasi gateway.
 - Temuan **B3/B4/B5** tidak lagi relevan karena kodenya dihapus.
 - **`sharp` dipertahankan** (tidak ikut dihapus di B12): dipakai `astro:assets` untuk memproses gambar lokal (`src/assets/logo.webp`); `marked` yang benar-benar mati sudah dihapus dari `package.json` + `bun.lock`.
+- **Agenda due dipromosikan saat dibaca** (R4): cron harian tetap menjadi jalur utama, tetapi `/api/agendas` juga memanggil `promoteDueAgenda()` supaya `publish_at` tidak telat sampai sehari karena batas cron plan Hobby. Biaya: satu query tambahan (`findFirst` agenda due) per pembacaan agenda publik; penulisan hanya terjadi saat benar-benar ada agenda due.
 
 ---
 
@@ -119,4 +115,27 @@ Catatan: perilaku fix di PR ini baru bisa diverifikasi di production setelah mer
 
 | ID | Sev | Temuan | Status | Commit |
 | :-- | :-- | :-- | :-- | :-- |
-| B16 | MEDIUM | GC ImageKit selalu dilewati bila `IMAGEKIT_URL_ENDPOINT` sudah memuat segmen folder (mis. `https://ik.imagekit.io/literasibrebesan`): path whitelist dihitung dari `endpointPath + folderPath` → prefiks ganda (`/literasibrebesan/literasibrebesan/...`) tidak pernah cocok, file tidak pernah terhapus. | SELESAI | e5b21f8 |
+| B16 | MEDIUM | GC ImageKit selalu dilewati bila `IMAGEKIT_URL_ENDPOINT` sudah memuat segmen folder (mis. `https://ik.imagekit.io/literasibrebesan`): path whitelist dihitung dari `endpointPath + folderPath` → prefiks ganda (`/literasibrebesan/literasibrebesan/...`) tidak pernah cocok, file tidak pernah terhapus. Perbaikannya sempat menimbulkan regresi **R1**. | SELESAI | e5b21f8 |
+
+---
+
+## G. Temuan dari Review PR (lanjutan audit)
+
+| ID | Sev | Temuan | Status | Commit |
+| :-- | :-- | :-- | :-- | :-- |
+| R1 | MEDIUM | **Regresi B16.** Whitelist GC memakai `pathname.endsWith("/<folder>/<file>")` → file artikel yang di-upload ke `/literasibrebesan/posts/<userId>/<YYYY-MM>/` tidak pernah cocok dengan folder induk `literasibrebesan/posts/<userId>` → gambar artikel tidak pernah dihapus (storage leak). | SELESAI | b150a6e |
+| R2 | LOW | `deletePost` action mengabaikan hasil `postsService.deletePost` → cek `deleted.count > 0` (B10) tidak berefek, non-pemilik tetap melihat "berhasil". `updatePost` juga memetakan "Post not found" ke `INTERNAL_SERVER_ERROR` generik. | SELESAI | dd47a5a |
+| R3 | LOW | Input `publish_at` di form edit agenda memakai `value` tanpa `onChange` → Preact menulis ulang `dom.value` setiap re-render, tanggal yang sudah diketik admin hilang begitu radio status diklik. | SELESAI | fc6f683 |
+| R4 | MEDIUM | `publish_at` hanya diproses cron harian (plan Hobby: sekali sehari, presisi ±59 menit) → agenda terjadwal 10:00 WIB baru tayang ~07:00 WIB keesokan harinya, padahal A3 baru memperbaiki konversi WIB dan fallback GitHub Actions sudah dihapus. | SELESAI | 062bf5e |
+
+Detail R4: logika promosi dipindah ke `agendaService.promoteDueAgenda()` (dipakai cron **dan** `/api/agendas`), tetap satu agenda per pemanggilan (`publish_at` paling awal, A5) dengan optimistic lock `updateMany`; publikasi manual mengisi `publishAt = sekarang` agar tidak ditimpa agenda due yang lebih lama. Kegagalan promosi di jalur baca tidak menggagalkan respons API.
+
+### G2. Catatan review yang belum diperbaiki (butuh keputusan)
+
+| ID | Sev | Catatan | Status |
+| :-- | :-- | :-- | :-- |
+| R5 | LOW | `updateAgenda` mengosongkan `publishAt` saat status diubah ke `draft`/`archived`; jadwal yang sudah diisi harus diketik ulang untuk menjadwalkan kembali. | TERJADI |
+| R6 | MEDIUM | Data `scheduled` yang dibuat **sebelum** A3 menyimpan jam WIB sebagai UTC → agenda tersebut tampil +7 jam di form edit dan bergeser 7 jam saat disimpan ulang. Perlu migrasi sekali jalan: `UPDATE agendas SET publish_at = publish_at + INTERVAL 7 HOUR WHERE publish_at IS NOT NULL;` (jalankan setelah dicek jumlah barisnya). | PERLU-VERIFIKASI |
+| R7 | LOW | `sanitize-html` ikut ter-bundle ke browser lewat `RichTextEditor.tsx` → chunk editor ~204 KB (island lain 12–16 KB). Tidak error runtime, hanya berat; bisa diringankan dengan dynamic import saat tab Preview diklik. | TERJADI |
+
+Catatan (bukan defect): A4 sengaja menampilkan agenda `published` meski `eventDate` sudah lewat; `getAuthSecret()` fail-fast membuat seluruh request ber-cookie `access_token` ikut 500 bila `AUTH_SECRET` hilang; `checkOrigin: true` perlu diuji login di production setelah deploy (rekonstruksi origin di belakang proxy).
