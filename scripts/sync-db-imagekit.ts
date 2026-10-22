@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { PrismaClient } from "@prisma/client";
+import { sanitizeContent } from "../src/features/posts/sanitize";
 
 // Load .env secara manual jika process.env belum terisi
 function loadEnv() {
@@ -125,9 +126,11 @@ async function main() {
       }
 
       if (postModified) {
+        // Sanitasi ulang: konten lama di DB bisa saja belum pernah disanitasi.
+        const safeContent = sanitizeContent(newContent);
         await prisma.post.update({
           where: { id: post.id },
-          data: { content: newContent },
+          data: { content: safeContent },
         });
         console.log(`  ✅ Post "${post.title}" (ID: ${post.id}) diperbarui.`);
         updatedPosts++;

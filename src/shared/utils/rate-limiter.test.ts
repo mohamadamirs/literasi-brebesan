@@ -4,6 +4,9 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     $executeRaw: vi.fn(),
     $queryRaw: vi.fn(),
+    driveCache: {
+      deleteMany: vi.fn(),
+    },
   },
 }));
 
@@ -141,5 +144,26 @@ describe("DatabaseRateLimiter", () => {
 
     expect(result.success).toBe(false);
     expect(result.remaining).toBe(0);
+  });
+
+  it("cleanup memakai deleteMany tanpa DELETE ... LIMIT (portable MySQL/TiDB)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    mockPrisma.$executeRaw.mockResolvedValue(1);
+    mockPrisma.driveCache.deleteMany.mockResolvedValue({ count: 2 });
+    mockPrisma.$queryRaw.mockResolvedValueOnce([
+      { count: 1, resetTime: new Date(Date.now() + 60000) },
+    ]);
+    mockPrisma.$queryRaw.mockResolvedValueOnce([{ k: "rl:aaa" }, { k: "rl:bbb" }]);
+
+    const limiter = new DatabaseRateLimiter();
+    await limiter.check("signin:203.0.113.10", { max: 3, windowMs: 60000 });
+
+    expect(mockPrisma.driveCache.deleteMany).toHaveBeenCalledWith({
+      where: { key: { in: ["rl:aaa", "rl:bbb"] } },
+    });
+    // tidak ada DELETE ... LIMIT pada query raw
+    for (const call of mockPrisma.$executeRaw.mock.calls) {
+      expect(call[0].join("?")).not.toContain("LIMIT");
+    }
   });
 });

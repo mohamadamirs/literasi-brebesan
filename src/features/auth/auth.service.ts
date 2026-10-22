@@ -400,6 +400,17 @@ export const authService = {
     const dataToUpdate: any = { email };
     let shouldRevokeSessions = false;
 
+    // Email harus unik: cek dulu agar P2002 tidak jadi error 500 generik.
+    const emailOwner = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (emailOwner && emailOwner.id !== id) {
+      const error: any = new Error("Email sudah digunakan akun lain.");
+      error.code = "CONFLICT";
+      throw error;
+    }
+
     if (password && password.length >= 6) {
       const salt = await bcrypt.genSalt(10);
       dataToUpdate.passwordHash = await bcrypt.hash(password, salt);

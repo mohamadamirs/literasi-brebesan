@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/prisma", () => {
-  const mockPrisma = {
+  const mockPrisma: any = {
     agenda: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => {
       delete: vi.fn(),
     },
   };
+  mockPrisma.$transaction = vi.fn(async (callback: any) => callback(mockPrisma));
   return {
     default: mockPrisma,
     prisma: mockPrisma,
@@ -47,7 +48,11 @@ describe("agendaService", () => {
 
       const result = await agendaService.getUpcomingAgendas(1);
 
-      expect(prisma.agenda.findMany).toHaveBeenCalled();
+      expect(prisma.agenda.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: "published" },
+        }),
+      );
       expect(result).toEqual([
         {
           id: "agenda-1",
@@ -63,6 +68,77 @@ describe("agendaService", () => {
           created_at: mockAgendas[0].createdAt,
         },
       ]);
+    });
+  });
+
+  describe("promoteDueAgenda", () => {
+    it("mempublikasikan agenda due paling awal lalu mengarsipkan agenda yang tayang", async () => {
+      const due = {
+        id: "agenda-due",
+        publishAt: new Date("2026-10-20T03:00:00.000Z"),
+      };
+      (prisma.agenda.findFirst as any)
+        .mockResolvedValueOnce(due)
+        .mockResolvedValueOnce({
+          publishAt: new Date("2026-10-01T00:00:00.000Z"),
+        });
+      (prisma.agenda.updateMany as any).mockResolvedValue({ count: 1 });
+
+      const result = await agendaService.promoteDueAgenda();
+
+      expect(result).toBe("published");
+      expect(prisma.agenda.updateMany).toHaveBeenNthCalledWith(1, {
+        where: {
+          id: "agenda-due",
+          status: "scheduled",
+          publishAt: { lte: expect.any(Date) },
+        },
+        data: { status: "published" },
+      });
+      expect(prisma.agenda.updateMany).toHaveBeenNthCalledWith(2, {
+        where: { status: "published", id: { not: "agenda-due" } },
+        data: { status: "archived" },
+      });
+    });
+
+    it("tidak menyentuh database bila tidak ada agenda due", async () => {
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce(null);
+
+      const result = await agendaService.promoteDueAgenda();
+
+      expect(result).toBe("none");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("tidak menimpa publikasi manual yang lebih baru", async () => {
+      (prisma.agenda.findFirst as any)
+        .mockResolvedValueOnce({
+          id: "agenda-due",
+          publishAt: new Date("2026-10-20T03:00:00.000Z"),
+        })
+        .mockResolvedValueOnce({
+          publishAt: new Date("2026-10-21T00:00:00.000Z"),
+        });
+
+      const result = await agendaService.promoteDueAgenda();
+
+      expect(result).toBe("superseded");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("tidak mengarsipkan agenda lain bila klaim gagal (diproses paralel)", async () => {
+      (prisma.agenda.findFirst as any)
+        .mockResolvedValueOnce({
+          id: "agenda-due",
+          publishAt: new Date("2026-10-20T03:00:00.000Z"),
+        })
+        .mockResolvedValueOnce(null);
+      (prisma.agenda.updateMany as any).mockResolvedValueOnce({ count: 0 });
+
+      const result = await agendaService.promoteDueAgenda();
+
+      expect(result).toBe("claimed");
+      expect(prisma.agenda.updateMany).toHaveBeenCalledOnce();
     });
   });
 
@@ -107,6 +183,16 @@ describe("agendaService", () => {
 
       expect(result).toBeNull();
     });
+
+    it("shouldconsider published agenda with past eventDate as conflict", async () => {
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce(null);
+
+      await agendaService.checkPublishedConflict();
+
+      expect(prisma.agenda.findFirst).toHaveBeenCalledWith({
+        where: { status: "published" },
+      });
+    });
   });
 
   describe("createAgenda", () => {
@@ -128,6 +214,29 @@ describe("agendaService", () => {
 
       expect(prisma.agenda.create).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
+    });
+
+    it("should store publish_at as UTC (input datetime-local dibaca sebagai WIB)", async () => {
+      (prisma.agenda.create as any).mockResolvedValueOnce({ id: "new-id" });
+
+      await agendaService.createAgenda({
+        title: "Scheduled Agenda",
+        description: "Description 10 chars",
+        event_date: "2026-10-25",
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/12345",
+        status: "scheduled",
+        publish_at: "2026-10-25T10:00",
+      });
+
+      expect(prisma.agenda.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            publishAt: new Date("2026-10-25T03:00:00.000Z"),
+          }),
+        }),
+      );
     });
 
     it("should throw conflict error if published agenda exists and override is false", async () => {
@@ -211,6 +320,45 @@ describe("agendaService", () => {
       expect(prisma.agenda.update).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
+
+    it("mempertahankan publishAt saat status diturunkan ke draft/archived", async () => {
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
+
+      await agendaService.updateAgenda("a1", {
+        title: "Agenda Diarsipkan",
+        description: "Desc",
+        event_date: "2026-10-02",
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/12345",
+        status: "archived",
+      });
+
+      const updateArg = (prisma.agenda.update as any).mock.calls[0][0];
+      expect(updateArg.data.status).toBe("archived");
+      // Jadwal yang sudah diisi tidak boleh ikut terhapus.
+      expect(updateArg.data).not.toHaveProperty("publishAt");
+    });
+
+    it("menyimpan jadwal WIB sebagai UTC saat status scheduled", async () => {
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
+
+      await agendaService.updateAgenda("a1", {
+        title: "Agenda Terjadwal",
+        description: "Desc",
+        event_date: "2026-10-02",
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/12345",
+        status: "scheduled",
+        publish_at: "2026-10-25T10:00",
+      });
+
+      const updateArg = (prisma.agenda.update as any).mock.calls[0][0];
+      expect(updateArg.data.publishAt.toISOString()).toBe(
+        "2026-10-25T03:00:00.000Z",
+      );
+    });
   });
 
   describe("deleteAgenda and quickPublishAgenda", () => {
@@ -237,7 +385,7 @@ describe("agendaService", () => {
       });
       expect(prisma.agenda.update).toHaveBeenCalledWith({
         where: { id: "a1" },
-        data: { status: "published", publishAt: null },
+        data: { status: "published", publishAt: expect.any(Date) },
       });
       expect(result).toEqual({ success: true });
     });

@@ -355,6 +355,24 @@ describe("postsService", () => {
       expect(result).toEqual({ success: true });
     });
     
+    it("should throw when non-admin update affects 0 rows (ownership mismatch)", async () => {
+      (prisma.post.findUnique as any).mockResolvedValueOnce({
+        id: "post-1",
+        status: "draft",
+        slug: "old-slug-draft",
+      });
+      (prisma.post.updateMany as any).mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        postsService.updatePost(
+          "post-1",
+          { title: "Judul Update User", content: "<p>Updated</p>", status: "draft" },
+          "user",
+          "user-2",
+        ),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
     it("should not update slug if post was already published", async () => {
       (prisma.post.findUnique as any).mockResolvedValueOnce({
         id: "post-1",
@@ -412,6 +430,19 @@ describe("postsService", () => {
         where: { id: "post-1", userId: "user-1" },
       });
       expect(result).toEqual({ success: true });
+    });
+
+    it("should report failure when non-admin delete affects 0 rows", async () => {
+      (prisma.post.deleteMany as any).mockResolvedValueOnce({ count: 0 });
+      (prisma.post.findFirst as any).mockResolvedValueOnce({
+        id: "post-1",
+        content: "<p>hello</p>",
+        userId: "user-1"
+      });
+
+      const result = await postsService.deletePost("post-1", "user-1", "user");
+
+      expect(result).toEqual({ success: false });
     });
   });
 

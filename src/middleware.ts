@@ -1,6 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 import { jwtVerify } from "jose";
-import { SECRET } from "@/shared/utils/jwt";
+import { getAuthSecret } from "@/shared/utils/jwt";
 import { authService } from "@/features/auth/auth.service";
 
 export const onRequest = defineMiddleware(async (context, next) => {
@@ -22,8 +22,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // JALUR 1: VERIFIKASI ACCESS TOKEN (JWT)
   if (accessToken) {
+    // getAuthSecret() di luar try: error konfigurasi harus terlihat jelas,
+    // bukan tertelan sebagai "token invalid".
+    const secret = getAuthSecret();
     try {
-      const { payload } = await jwtVerify(accessToken, SECRET);
+      const { payload } = await jwtVerify(accessToken, secret);
       userData = {
         id: (payload.userId as string) || "",
         role: (payload.role as string) || "user",

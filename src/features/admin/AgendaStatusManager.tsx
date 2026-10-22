@@ -1,8 +1,11 @@
 import { useState } from 'preact/hooks';
+import { formatWibDateTime } from '@/shared/utils/utils';
+
+export type AgendaStatus = 'draft' | 'published' | 'scheduled' | 'archived';
 
 interface Props {
-  initialStatus: 'draft' | 'published' | 'scheduled';
-  initialPublishAt: string | null;
+  initialStatus: AgendaStatus;
+  initialPublishAt: string | Date | null;
 }
 
 export default function AgendaStatusManager({ initialStatus, initialPublishAt }: Props) {
@@ -48,6 +51,18 @@ export default function AgendaStatusManager({ initialStatus, initialPublishAt }:
           />
           <div class="text-center py-3 rounded-xl md:rounded-full text-[11px] font-black uppercase text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all">Tayang</div>
         </label>
+
+        <label class="flex-1 min-w-[100px] cursor-pointer">
+          <input 
+            type="radio" 
+            name="status" 
+            value="archived" 
+            class="peer hidden" 
+            checked={status === 'archived'} 
+            onChange={() => setStatus('archived')}
+          />
+          <div class="text-center py-3 rounded-xl md:rounded-full text-[11px] font-black uppercase text-slate-500 peer-checked:bg-slate-700 peer-checked:text-white transition-all">Arsip</div>
+        </label>
       </div>
 
       {/* Input Tanggal Rilis Otomatis (Hanya muncul jika terjadwal) */}
@@ -57,7 +72,7 @@ export default function AgendaStatusManager({ initialStatus, initialPublishAt }:
           <input 
             type="datetime-local" 
             name="publish_at" 
-            value={initialPublishAt ? new Date(initialPublishAt).toISOString().slice(0, 16) : ''}
+            defaultValue={formatWibDateTime(initialPublishAt)}
             required
             class="w-full px-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] font-bold text-slate-700 outline-none focus:border-amber-500 transition-all shadow-sm"
           />

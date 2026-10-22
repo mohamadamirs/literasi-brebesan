@@ -38,21 +38,16 @@ export const agendaActions = {
         });
       }
 
+      // Urutan penting: upload poster baru -> update DB -> baru garbage collect
+      // poster lama. Kalau GC dulu, upload/DB yang gagal membuat DB menunjuk
+      // gambar yang sudah dihapus (broken image) atau file baru jadi orphan.
+      const oldImageUrl = input.id
+        ? await agendaService.getAgendaImageUrl(input.id)
+        : null;
+
       let imageUrl: string | null = null;
       if (input.poster && input.poster.size > 0) {
         try {
-          // Jika update, hapus gambar lama dulu jika ada
-          if (input.id) {
-            const oldImageUrl = await agendaService.getAgendaImageUrl(input.id);
-            if (oldImageUrl) {
-              try {
-                await deleteFromImageKitByUrl(oldImageUrl, "literasibrebesan/agenda-posters");
-              } catch (delError) {
-                console.error("Gagal menghapus gambar agenda lama:", delError);
-              }
-            }
-          }
-
           const buffer = Buffer.from(await input.poster.arrayBuffer());
           const filename = `${Date.now()}.${imageFileExtension(input.poster.type)}`;
           const blob = await uploadToImageKit(
@@ -82,7 +77,6 @@ export const agendaActions = {
             image_url: imageUrl,
           });
         }
-        return { success: true };
       } catch (dbError: any) {
         if (dbError.code === "CONFLICT") {
           throw new ActionError({
@@ -102,6 +96,20 @@ export const agendaActions = {
           message: "Gagal menyimpan data agenda ke database.",
         });
       }
+
+      // Data sudah aman di DB, sekarang boleh buang poster lama.
+      if (oldImageUrl && imageUrl) {
+        try {
+          await deleteFromImageKitByUrl(
+            oldImageUrl,
+            "literasibrebesan/agenda-posters"
+          );
+        } catch (delError) {
+          console.error("Gagal menghapus gambar agenda lama:", delError);
+        }
+      }
+
+      return { success: true };
     },
   }),
 

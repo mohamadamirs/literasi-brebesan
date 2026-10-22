@@ -73,22 +73,39 @@ export async function deleteFromImageKitByUrl(
     if (!urlEndpoint) return;
 
     const endpoint = new URL(urlEndpoint);
-    const endpointPath = endpoint.pathname.replace(/\/+$/, "");
-    const folderPath = allowedFolder.replace(/^\/+|\/+$/g, "");
-    const applicationPath = `${endpointPath}/${folderPath}/`;
-    if (
-      urlObj.origin !== endpoint.origin ||
-      !urlObj.pathname.startsWith(applicationPath)
-    ) {
+    const segments = urlObj.pathname.split("/").filter(Boolean);
+    if (segments.length < 2) return;
+    const rawFileName = segments[segments.length - 1];
+    if (!/^[a-zA-Z0-9._%-]+$/.test(rawFileName)) return;
+
+    // Folder whitelist: file harus berada DI DALAM folder yang diizinkan.
+    // Subfolder tetap boleh (upload artikel memakai /<userId>/<YYYY-MM>/),
+    // jadi pencocokan per segmen, bukan prefix path URL. Segmen juga aman
+    // untuk endpoint yang sudah memuat segmen folder
+    // (mis. https://ik.imagekit.io/literasibrebesan).
+    const allowedSegments = allowedFolder
+      .replace(/^\/+|\/+$/g, "")
+      .split("/")
+      .filter(Boolean);
+    if (allowedSegments.length === 0) return;
+    const parentSegments = segments.slice(0, -1);
+    const allowedIndex = parentSegments.findIndex((_, index) =>
+      allowedSegments.every((seg, offset) => parentSegments[index + offset] === seg),
+    );
+    if (urlObj.origin !== endpoint.origin || allowedIndex === -1) {
       return;
     }
 
-    const fileName = decodeURIComponent(urlObj.pathname.split("/").pop() || "");
-
-    if (!fileName || !/^[a-zA-Z0-9._-]+$/.test(fileName)) return;
+    const fileName = decodeURIComponent(rawFileName);
+    // Folder tempat file benar-benar berada, dipakai untuk mempersempit
+    // pencarian: tanpa ini file dengan nama sama di folder lain bisa memenuhi
+    // hasil, dan limit default bisa memotong file yang mau dihapus.
+    const parentPath = `/${parentSegments.join("/")}`;
 
     const files = await ik.listFiles({
+      path: parentPath,
       searchQuery: `name="${fileName}"`,
+      limit: 1000,
     });
     const matchingFile = files.find((file) => {
       try {

@@ -1,7 +1,6 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { postsService } from "@/features/posts/posts.service";
-import { whatsappService } from "@/services/whatsapp.service";
 
 export const postActions = {
   createPost: defineAction({
@@ -26,16 +25,7 @@ export const postActions = {
       }
 
       try {
-        const result = await postsService.createPost(input, user.id, user.role);
-        if (result.status === "pending") {
-          whatsappService
-            .notifyArticleSubmitted({
-              title: input.title,
-              authorName: (user as any).name || (user as any).email || "Penulis",
-              postId: result.id,
-            })
-            .catch((err) => console.warn("[WA Post Notification Failed]", err));
-        }
+        await postsService.createPost(input, user.id, user.role);
         return { success: true };
       } catch (e: any) {
         console.error("Create post error:", e);
@@ -72,17 +62,15 @@ export const postActions = {
 
       try {
         await postsService.updatePost(input.id, input, user.role, user.id);
-        if (input.status === "published") {
-          whatsappService
-            .notifyArticlePublished({
-              title: input.title,
-              slug: input.id,
-            })
-            .catch((err) => console.warn("[WA Post Published Notification Failed]", err));
-        }
         return { success: true };
       } catch (e: any) {
         console.error("Update post error:", e);
+        if (e.code === "NOT_FOUND") {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: e.message,
+          });
+        }
         throw new ActionError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Gagal memperbarui tulisan.",
@@ -103,9 +91,9 @@ export const postActions = {
         });
       }
 
+      let result: { success: boolean };
       try {
-        await postsService.deletePost(input.id, user.id, user.role);
-        return { success: true };
+        result = await postsService.deletePost(input.id, user.id, user.role);
       } catch (e: any) {
         console.error("Delete post error:", e);
         throw new ActionError({
@@ -113,6 +101,16 @@ export const postActions = {
           message: "Gagal menghapus tulisan.",
         });
       }
+
+      // deleteMany 0 baris = bukan pemilik / sudah dihapus: jangan lapor sukses.
+      if (!result.success) {
+        throw new ActionError({
+          code: "NOT_FOUND",
+          message: "Tulisan tidak ditemukan atau bukan milik Anda.",
+        });
+      }
+
+      return { success: true };
     },
   }),
 

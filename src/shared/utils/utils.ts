@@ -40,6 +40,37 @@ export const formatDate = (date: any) => {
   });
 };
 
+// WIB (Asia/Jakarta) = UTC+7, tanpa DST.
+const WIB_OFFSET_MINUTES = 7 * 60;
+
+/**
+ * Input admin memakai <input type="datetime-local"> => "2026-10-25T10:00" (waktu WIB).
+ * Server (Vercel) berjalan di UTC, jadi nilai tanpa offset harus ditafsirkan
+ * eksplisit sebagai WIB lalu dikonversi ke UTC sebelum disimpan.
+ */
+export const parseWibDateTime = (value: string): Date => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(
+    value.trim(),
+  );
+  if (!match) return new Date(value);
+  const [, y, mo, d, h, mi, s] = match;
+  const utcMs =
+    Date.UTC(+y, +mo - 1, +d, +h, +mi, +(s ?? 0)) -
+    WIB_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMs);
+};
+
+/**
+ * Kebalikan: Date (UTC) -> "YYYY-MM-DDTHH:mm" dalam WIB untuk nilai input datetime-local.
+ */
+export const formatWibDateTime = (value: string | Date | null): string => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const wib = new Date(date.getTime() + WIB_OFFSET_MINUTES * 60 * 1000);
+  return wib.toISOString().slice(0, 16);
+};
+
 // Helper untuk ambil gambar pertama dari konten (Vercel Blob / Editor Images)
 export const extractFirstImage = (html: string) => {
   if (!html) return null;
