@@ -18,7 +18,8 @@ export default defineConfig({
   },
 
   security: {
-    checkOrigin: false,
+    // Proteksi CSRF bawaan Astro: POST lintas-origin ke server action ditolak.
+    checkOrigin: true,
   },
 
   prefetch: {
