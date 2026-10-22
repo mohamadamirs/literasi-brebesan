@@ -1,10 +1,8 @@
-import { defineAction } from "astro:actions";
+import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro:schema";
 import { Resend } from "resend";
 import sanitizeHtml from "sanitize-html";
 import { whatsappService } from "@/services/whatsapp.service";
-
-const resend = new Resend(import.meta.env.RESEND_API_KEY);
 
 export const contactActions = {
   sendContact: defineAction({
@@ -27,6 +25,20 @@ export const contactActions = {
         allowedTags: [],
         allowedAttributes: {},
       });
+
+      // Instansiasi di dalam handler: `new Resend(undefined)` melempar error,
+      // sehingga instantiation di module scope membuat seluruh server gagal boot
+      // ketika RESEND_API_KEY belum disetel.
+      const resendApiKey =
+        import.meta.env.RESEND_API_KEY || process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        console.error("RESEND_API_KEY is not set.");
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Sistem email belum dikonfigurasi.",
+        });
+      }
+      const resend = new Resend(resendApiKey);
 
       try {
         const { data, error } = await resend.emails.send({
