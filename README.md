@@ -182,7 +182,7 @@ npx prisma generate      # Regenerasi Prisma Client setelah ubah skema
 
 1. Pastikan semua environment variable di §8 terkonfigurasi di Vercel Project Settings.
 2. Build command: `bun run build` (atau `npm run build`). Output serverless otomatis via `@astrojs/vercel`.
-3. Konfigurasikan cron job untuk `GET /api/cron/cleanup-sessions` (harian) dan `GET /api/cron/publish-agenda` (misal tiap 5 menit) dengan header `Authorization: Bearer <CRON_SECRET>`.
+3. Cron job berjalan otomatis via blok `crons` di `vercel.json` (Vercel mengirim `Authorization: Bearer $CRON_SECRET` dari env project); fallback GitHub Actions tersedia di `.github/workflows/`.
 4. File bersifat **ephemeral** — jangan pernah menulis ke disk lokal di runtime produksi.
 
 ## 11. Catatan Implementasi

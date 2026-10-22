@@ -70,6 +70,26 @@ bukti runtime/DB.
 
 ---
 
+## D2. Verifikasi Production (2026-10-22)
+
+Konfirmasi pemilik: **seluruh environment variable sudah terpasang di Vercel** (`DATABASE_URL`, `AUTH_SECRET`, `IMAGEKIT_*`, `RESEND_*`, `GOOGLE_*`, `CRON_SECRET`).
+
+| Cek (kode yang sekarang live, sebelum PR ini) | Hasil | Catatan |
+| :-- | :-- | :-- |
+| `GET /` | 200 | Halaman muka normal |
+| `GET /publikasi` | 200 | Arsip publikasi normal |
+| `GET /api/posts?limit=9` | 200 | JSON artikel tampil |
+| `GET /api/posts?limit=abc` | **500** | Bukti langsung temuan **B9** (NaN → Prisma error) — sudah diperbaiki di 11ce7c2 |
+| `GET /api/posts?limit=999` | 200 | Tanpa batas maksimum (bagian B9) — sudah diperbaiki di 11ce7c2 |
+| `GET /api/cron/publish-agenda` tanpa token | 401 `Unauthorized` | Fail-closed bekerja; `CRON_SECRET` ada di Vercel |
+| `GET /api/cron/cleanup-sessions` tanpa token | 401 `Unauthorized` | Sama |
+| `GET /sitemap.xml` | 200 | Sitemap dinamis normal |
+| `GET /api/agendas` | 200 `null` | By design: tidak ada agenda `published` saat ini (`agendas[0] \|\| null`) |
+
+Catatan: perilaku fix di PR ini baru bisa diverifikasi di production setelah merge + deploy.
+
+---
+
 ## E. Keputusan Produk
 
 - **Integrasi WhatsApp Gateway dihapus** (permintaan pemilik): file `src/services/whatsapp.service.ts` dihapus, pemanggilan di `src/features/posts/posts.ts` & `src/features/home/contact.ts` dibuang, export barrel `src/services/index.ts` diperbarui, env `WA_GATEWAY_*`/`WA_ADMIN_PHONE` dihapus dari `.env.example`, dan dokumentasi (`README.md`, `AGENTS.md`, `TECH_DESIGN.md`) diperbarui.
