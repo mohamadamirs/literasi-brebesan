@@ -130,13 +130,14 @@ curl -i -H "Authorization: Bearer <CRON_SECRET dari Vercel env>" \
 
 Detail R4: logika promosi dipindah ke `agendaService.promoteDueAgenda()` (dipakai cron **dan** `/api/agendas`), tetap satu agenda per pemanggilan (`publish_at` paling awal, A5) dengan optimistic lock `updateMany`; publikasi manual mengisi `publishAt = sekarang` agar tidak ditimpa agenda due yang lebih lama. Kegagalan promosi di jalur baca tidak menggagalkan respons API.
 
-### G2. Catatan review lanjutan (R5–R7)
+### G2. Catatan review lanjutan (R5–R8)
 
 | ID | Sev | Catatan | Status | Commit |
 | :-- | :-- | :-- | :-- | :-- |
 | R5 | LOW | `updateAgenda` mengosongkan `publishAt` saat status diubah ke `draft`/`archived` → jadwal yang sudah diisi harus diketik ulang. Kini `publishAt` hanya ditulis untuk `scheduled`/`published`; draft/archived mempertahankan nilai lama. | SELESAI | d8f615a |
 | R6 | MEDIUM | Agenda yang dijadwalkan **sebelum** A3 menyimpan jam WIB sebagai UTC → tampil +7 jam di form edit. Skrip idempoten `scripts/fix-publish-at-wib.ts` (hanya status `scheduled`). **Sudah dijalankan di production 22 Okt 2026 17:44 UTC: 0 baris digeser, penanda ditulis.** | SELESAI | 54aada9 + 05f66b4 |
 | R7 | LOW | `sanitize-html` ter-bundle ke browser lewat `RichTextEditor.tsx` → chunk editor ~204 KB. Kini sanitizer dimuat `import()` saat tab Preview diklik: chunk editor 204 KB → 4,4 KB, `sanitize.*.js` (204 KB) on-demand. | SELESAI | 891cf7d |
+| R8 | HIGH | Edit agenda crash saat ada agenda `published` lain: `checkPublishedConflict()` mengembalikan objek, tetapi template membaca `conflict[0].title`. Kini render memakai `conflict.title` dan pemeriksaan null langsung. | SELESAI | 6fec3da |
 
 **R6 — sudah dieksekusi di production (22 Okt 2026 17:44 UTC)**
 
