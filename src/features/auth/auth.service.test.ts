@@ -320,6 +320,7 @@ describe("authService", () => {
     });
 
     it("should update user", async () => {
+      (prisma.user.findUnique as any).mockResolvedValueOnce(null);
       (prisma.user.update as any).mockResolvedValueOnce({});
       (prisma.profile.update as any).mockResolvedValueOnce({});
 
@@ -328,6 +329,36 @@ describe("authService", () => {
         fullName: "Updated Name",
         email: "updated@example.com",
         role: "admin",
+      });
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it("should throw CONFLICT when email is used by another account", async () => {
+      (prisma.user.findUnique as any).mockResolvedValueOnce({ id: "u2" });
+
+      await expect(
+        authService.updateUser({
+          id: "u1",
+          fullName: "Updated Name",
+          email: "taken@example.com",
+          role: "user",
+        }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("should allow update when the email belongs to the same account", async () => {
+      (prisma.user.findUnique as any).mockResolvedValueOnce({ id: "u1" });
+      (prisma.user.update as any).mockResolvedValueOnce({});
+      (prisma.profile.update as any).mockResolvedValueOnce({});
+
+      const result = await authService.updateUser({
+        id: "u1",
+        fullName: "Updated Name",
+        email: "same@example.com",
+        role: "user",
       });
 
       expect(result).toEqual({ success: true });

@@ -337,6 +337,12 @@ export const authActions = {
         return { success: true };
       } catch (e: any) {
         console.error("Admin Update User error:", e);
+        if (e.code === "CONFLICT") {
+          throw new ActionError({
+            code: "CONFLICT",
+            message: e.message,
+          });
+        }
         throw new ActionError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Gagal memperbarui user.",
