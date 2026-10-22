@@ -1,1 +1,12 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/cron/publish-agenda",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-sessions",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

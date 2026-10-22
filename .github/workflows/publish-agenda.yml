@@ -1,5 +1,8 @@
 name: Publish scheduled agenda
 
+# Jalur utama: cron bawaan Vercel (vercel.json) memakai env CRON_SECRET project.
+# Workflow ini adalah cadangan; butuh repository variable APP_BASE_URL dan
+# repository secret CRON_SECRET yang nilainya sama dengan env Vercel.
 on:
   schedule:
     - cron: "0 * * * *"
@@ -19,12 +22,12 @@ jobs:
     steps:
       - name: Call agenda publishing endpoint
         env:
-          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          APP_BASE_URL: ${{ vars.APP_BASE_URL || 'https://literasibrebesan.my.id' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
           : "${APP_BASE_URL:?Set APP_BASE_URL in repository variables}"
-          : "${CRON_SECRET:?Set CRON_SECRET in repository secrets}"
+          : "${CRON_SECRET:?Set CRON_SECRET in repository secrets (nilainya harus sama dengan env CRON_SECRET di Vercel)}"
           curl \
             --fail-with-body \
             --silent \
