@@ -72,7 +72,7 @@ export default function AgendaStatusManager({ initialStatus, initialPublishAt }:
           <input 
             type="datetime-local" 
             name="publish_at" 
-            value={formatWibDateTime(initialPublishAt)}
+            defaultValue={formatWibDateTime(initialPublishAt)}
             required
             class="w-full px-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] font-bold text-slate-700 outline-none focus:border-amber-500 transition-all shadow-sm"
           />
