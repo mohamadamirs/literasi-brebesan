@@ -157,12 +157,23 @@ export class DatabaseRateLimiter {
     `;
 
     if (Math.random() < 0.01) {
-      await prisma.$executeRaw`
-        DELETE FROM drive_cache
+      // Cleanup harus portable MySQL/TiDB: `DELETE ... LIMIT` tidak bisa
+      // diasumsikan didukung. Ambil kunci dulu (SELECT ... LIMIT), lalu hapus
+      // per daftar kunci.
+      const expired = await prisma.$queryRaw<Array<{ k: string }>>`
+        SELECT \`key\` AS k
+        FROM drive_cache
         WHERE \`key\` LIKE 'rl:%'
           AND expires_at < CURRENT_TIMESTAMP(3)
         LIMIT 500
       `;
+
+      if (expired.length > 0) {
+        const keys = expired.map((row) => row.k);
+        await prisma.driveCache.deleteMany({
+          where: { key: { in: keys } },
+        });
+      }
     }
 
     const record = rows[0];
