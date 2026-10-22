@@ -60,7 +60,7 @@ vi.mock("bcryptjs", () => ({
 vi.mock("@/shared/utils/jwt", () => ({
   createSessionToken: vi.fn(async () => "mock-jwt-token"),
   generateRefreshToken: vi.fn(() => "mock-refresh-token"),
-  SECRET: new Uint8Array([1, 2, 3]),
+  getAuthSecret: vi.fn(() => new Uint8Array([1, 2, 3])),
 }));
 
 import prisma from "@/lib/prisma";
