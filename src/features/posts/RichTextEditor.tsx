@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { sanitizeContent } from "@/features/posts/sanitize";
 
 interface Props {
   name: string;
@@ -15,6 +16,7 @@ declare global {
 export default function RichTextEditor({ name, value = "", placeholder = "Tulis ceritamu di sini..." }: Props) {
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write');
   const [content, setContent] = useState(value);
+  const [previewHtml, setPreviewHtml] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const quillRef = useRef<HTMLDivElement>(null);
   const quillInstance = useRef<any>(null);
@@ -174,7 +176,10 @@ export default function RichTextEditor({ name, value = "", placeholder = "Tulis 
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('preview')}
+                onClick={() => {
+                  setPreviewHtml(sanitizeContent(content));
+                  setActiveTab('preview');
+                }}
                 className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
                   activeTab === 'preview' 
                     ? 'bg-blue-600 text-white shadow-md' 
@@ -215,7 +220,7 @@ export default function RichTextEditor({ name, value = "", placeholder = "Tulis 
                          prose-blockquote:border-l-4 prose-blockquote:border-blue-600 
                          prose-blockquote:bg-blue-50/50 prose-blockquote:p-8 
                          prose-blockquote:rounded-r-3xl prose-blockquote:italic"
-              dangerouslySetInnerHTML={{ __html: content }}
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
             />
           </div>
         )}

@@ -1,23 +1,11 @@
 import prisma from "@/lib/prisma";
 import { v4 as uuidv4 } from "uuid";
 import { generateSlug } from "@/shared/utils/utils";
-import sanitizeHtml from "sanitize-html";
+import { sanitizeContent } from "@/features/posts/sanitize";
 
 import { deleteFromImageKitByUrl } from "@/shared/utils/imagekit";
 
-export const sanitizeOptions = {
-  allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-    "img",
-    "h1",
-    "h2",
-    "blockquote",
-  ]),
-  allowedAttributes: {
-    ...sanitizeHtml.defaults.allowedAttributes,
-    img: ["src", "alt", "class", "width", "height"],
-  },
-  allowedSchemes: ["http", "https", "data"],
-};
+export { sanitizeOptions } from "@/features/posts/sanitize";
 
 function deletePostImages(content: string | null, authorId: string): void {
   const imageRegex = /<img[^>]+src="([^">]+)"/g;
@@ -186,7 +174,7 @@ export const postsService = {
 
     const id = uuidv4();
     const slug = generateSlug(data.title);
-    const safeContent = sanitizeHtml(data.content || "", sanitizeOptions);
+    const safeContent = sanitizeContent(data.content);
 
     const created = await prisma.post.create({
       data: {
@@ -210,7 +198,7 @@ export const postsService = {
     userRole: string,
     authorId?: string
   ): Promise<{ success: boolean }> {
-    const safeContent = sanitizeHtml(data.content || "", sanitizeOptions);
+    const safeContent = sanitizeContent(data.content);
 
     const existingPost = await prisma.post.findUnique({
       where: { id },
