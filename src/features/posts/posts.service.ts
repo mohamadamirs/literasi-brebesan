@@ -229,7 +229,7 @@ export const postsService = {
       if (authorId) {
         where.userId = authorId;
       }
-      await prisma.post.updateMany({
+      const result = await prisma.post.updateMany({
         where,
         data: {
           title: data.title,
@@ -240,6 +240,10 @@ export const postsService = {
           rejectionReason: null,
         },
       });
+      // 0 baris = post tidak ada atau bukan milik penulis → jangan diam-diam sukses.
+      if (result.count === 0) {
+        throw new Error("Post not found");
+      }
     }
     return { success: true };
   },
@@ -258,10 +262,10 @@ export const postsService = {
 
       deletePostImages(userPost.content, userId);
       
-      await prisma.post.deleteMany({
+      const deleted = await prisma.post.deleteMany({
         where: { id, userId },
       });
-      return { success: true };
+      return { success: deleted.count > 0 };
     }
 
     const postToDelete = await prisma.post.findUnique({
