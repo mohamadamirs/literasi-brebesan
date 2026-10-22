@@ -72,9 +72,9 @@ bukti runtime/DB.
 
 ## D2. Verifikasi Production (2026-10-22)
 
-Konfirmasi pemilik: environment variable sudah terpasang di Vercel (`DATABASE_URL`, `AUTH_SECRET`, `IMAGEKIT_*`, `RESEND_*`, `GOOGLE_*`, **`CRON_SECRET`**). Catatan: 401 dari `/api/cron/*` **tidak** membuktikan secret terpasang — `verifyCronRequest` fail-closed mengembalikan 401 yang sama saat secret kosong maupun salah.
+Catatan: 401 dari `/api/cron/*` **tidak** membuktikan secret terpasang — `verifyCronRequest` fail-closed mengembalikan 401 yang sama saat secret kosong maupun salah.
 
-Tindakan 2026-10-22: `CRON_SECRET` GitHub repository secret dibuat (nilai acak) sebagai fallback workflow cron. Karena nilainya berbeda dari `CRON_SECRET` di Vercel, nilainya harus **disinkronkan manual** (lihat §D2 "Tindak lanjut") agar fallback GitHub Actions tidak mendapat 401. Jalur utama (cron bawaan Vercel via `vercel.json`) tidak terpengaruh.
+Status cron: `CRON_SECRET` **sudah ada** di Vercel project env. Jalur cron tunggal = cron bawaan Vercel lewat `vercel.json` (publish-agenda harian 00:00 UTC, cleanup-sessions 03:00 UTC). Fallback GitHub Actions dihapus (2026-10-22) beserta repository secret `CRON_SECRET` & variable `APP_BASE_URL` — tidak ada lagi nilai secret yang harus disinkronkan antar dua tempat. Konsekuensi: agenda `scheduled` tayang paling lambat ±1 hari (harian), jadi admin sebaiknya mengatur `publish_at` minimal H-1.
 
 | Cek (kode yang sekarang live, sebelum PR ini) | Hasil | Catatan |
 | :-- | :-- | :-- |
