@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { sanitizeContent } from "@/features/posts/sanitize";
 
 interface Props {
   name: string;
@@ -176,8 +175,17 @@ export default function RichTextEditor({ name, value = "", placeholder = "Tulis 
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setPreviewHtml(sanitizeContent(content));
+                onClick={async () => {
+                  // Sanitizer (sanitize-html + postcss) berat (~180 KB). Dimuat
+                  // saat Preview pertama kali diklik supaya bundle editor tetap
+                  // ringan. Kalau gagal dimuat, jangan render HTML mentah (B6).
+                  try {
+                    const { sanitizeContent } = await import('@/features/posts/sanitize');
+                    setPreviewHtml(sanitizeContent(content));
+                  } catch (err) {
+                    console.error('Gagal memuat sanitizer preview:', err);
+                    return;
+                  }
                   setActiveTab('preview');
                 }}
                 className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
