@@ -135,16 +135,31 @@ Detail R4: logika promosi dipindah ke `agendaService.promoteDueAgenda()` (dipaka
 | ID | Sev | Catatan | Status | Commit |
 | :-- | :-- | :-- | :-- | :-- |
 | R5 | LOW | `updateAgenda` mengosongkan `publishAt` saat status diubah ke `draft`/`archived` → jadwal yang sudah diisi harus diketik ulang. Kini `publishAt` hanya ditulis untuk `scheduled`/`published`; draft/archived mempertahankan nilai lama. | SELESAI | d8f615a |
-| R6 | MEDIUM | Agenda yang dijadwalkan **sebelum** A3 menyimpan jam WIB sebagai UTC → tampil +7 jam di form edit dan bergeser 7 jam saat disimpan ulang. Tersedia skrip migrasi idempoten `scripts/fix-publish-at-wib.ts`. | SELESAI (skrip) | 54aada9 |
+| R6 | MEDIUM | Agenda yang dijadwalkan **sebelum** A3 menyimpan jam WIB sebagai UTC → tampil +7 jam di form edit. Skrip idempoten `scripts/fix-publish-at-wib.ts` (hanya status `scheduled`). **Sudah dijalankan di production 22 Okt 2026 17:44 UTC: 0 baris digeser, penanda ditulis.** | SELESAI | 54aada9 + 05f66b4 |
 | R7 | LOW | `sanitize-html` ter-bundle ke browser lewat `RichTextEditor.tsx` → chunk editor ~204 KB. Kini sanitizer dimuat `import()` saat tab Preview diklik: chunk editor 204 KB → 4,4 KB, `sanitize.*.js` (204 KB) on-demand. | SELESAI | 891cf7d |
 
-**Tindakan operasional R6** (setelah merge + deploy fix A3):
+**R6 — sudah dieksekusi di production (22 Okt 2026 17:44 UTC)**
+
+Env `DATABASE_URL` di Vercel bertipe `sensitive` sehingga tidak bisa dibaca lewat CLI/API (`vercel env pull` hanya menghasilkan `[SENSITIVE]`). Migrasi dijalankan dari dalam runtime Vercel lewat preview deployment sementara + endpoint bertoken, lalu deployment dihapus.
+
+Hasil:
+
+| Item | Nilai |
+| :-- | :-- |
+| Baris `publish_at` non-null | 3 (1 `draft`, 2 `published`) |
+| Baris digeser | **0** — tidak ada agenda berstatus `scheduled` |
+| Penanda `migration:publish-at-wib-v1` | ditulis (`{"appliedAt":"2026-10-22T17:44:18.559Z","rows":0}`) |
+| Data sesudah migrasi | identik dengan sebelum (diverifikasi lewat endpoint yang sama) |
+
+Ketiga baris **tidak boleh** digeser: detiknya `:58`, `:33`, `:14` (bukan `:00`), tanda nilainya berasal dari `new Date()` saat dipublikasikan, bukan dari input `datetime-local`. Karena itu pula filter skrip dikunci ke `status = 'scheduled'` (05f66b4) — versi pertama yang menggeser semua baris akan merusak 2 agenda `published`.
+
+Untuk deployment berikutnya, skrip tetap tersedia:
 
 ```bash
 npm run fix:publish-at-wib                 # dry-run: lihat daftar agenda & publish_at
-npm run fix:publish-at-wib -- --apply      # geser +7 jam + tulis penanda
+npm run fix:publish-at-wib -- --apply      # geser +7 jam (scheduled) + tulis penanda
 ```
 
-Penanda `migration:publish-at-wib-v1` di `drive_cache` membuat skrip aman dijalankan ulang (tidak menggeser dua kali). Kalau tabel `agendas` belum punya baris dengan `publish_at`, cukup jalankan `--apply` sekali agar penandanya tertulis — pergeseran berikutnya tidak akan terjadi.
+Penanda di `drive_cache` membuat skrip aman dijalankan ulang (tidak menggeser dua kali). Bila nanti muncul agenda berstatus `scheduled` yang dibuat **sebelum** fix A3 ter-deploy, hapus penanda lalu jalankan `--apply` sekali lagi.
 
 Catatan (bukan defect): A4 sengaja menampilkan agenda `published` meski `eventDate` sudah lewat; `getAuthSecret()` fail-fast membuat seluruh request ber-cookie `access_token` ikut 500 bila `AUTH_SECRET` hilang; `checkOrigin: true` perlu diuji login di production setelah deploy (rekonstruksi origin di belakang proxy).
