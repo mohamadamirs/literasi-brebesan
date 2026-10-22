@@ -5,7 +5,7 @@ Dokumen ini berisi daftar error faktual yang ditemukan pada audit kode Literasi 
 
 - Audit: 2026-10-22
 - Branch: `fix/audit-critical-fixes`
-- Verifikasi: `vitest run` (15 file / 114 test) + `astro build` (sukses) + probe test per temuan
+- Verifikasi: `vitest run` (15 file / 116 test) + `astro build` (sukses) + probe test per temuan
 
 Status enum: `SELESAI` = sudah diperbaiki & di-commit · `PROSES` = sedang dikerjakan ·
 `TERJADI` = terkonfirmasi ada, belum diperbaiki · `PERLU-VERIFIKASI` = indikasi kuat, perlu
@@ -130,12 +130,21 @@ curl -i -H "Authorization: Bearer <CRON_SECRET dari Vercel env>" \
 
 Detail R4: logika promosi dipindah ke `agendaService.promoteDueAgenda()` (dipakai cron **dan** `/api/agendas`), tetap satu agenda per pemanggilan (`publish_at` paling awal, A5) dengan optimistic lock `updateMany`; publikasi manual mengisi `publishAt = sekarang` agar tidak ditimpa agenda due yang lebih lama. Kegagalan promosi di jalur baca tidak menggagalkan respons API.
 
-### G2. Catatan review yang belum diperbaiki (butuh keputusan)
+### G2. Catatan review lanjutan (R5–R7)
 
-| ID | Sev | Catatan | Status |
-| :-- | :-- | :-- | :-- |
-| R5 | LOW | `updateAgenda` mengosongkan `publishAt` saat status diubah ke `draft`/`archived`; jadwal yang sudah diisi harus diketik ulang untuk menjadwalkan kembali. | TERJADI |
-| R6 | MEDIUM | Data `scheduled` yang dibuat **sebelum** A3 menyimpan jam WIB sebagai UTC → agenda tersebut tampil +7 jam di form edit dan bergeser 7 jam saat disimpan ulang. Perlu migrasi sekali jalan: `UPDATE agendas SET publish_at = publish_at + INTERVAL 7 HOUR WHERE publish_at IS NOT NULL;` (jalankan setelah dicek jumlah barisnya). | PERLU-VERIFIKASI |
-| R7 | LOW | `sanitize-html` ikut ter-bundle ke browser lewat `RichTextEditor.tsx` → chunk editor ~204 KB (island lain 12–16 KB). Tidak error runtime, hanya berat; bisa diringankan dengan dynamic import saat tab Preview diklik. | TERJADI |
+| ID | Sev | Catatan | Status | Commit |
+| :-- | :-- | :-- | :-- | :-- |
+| R5 | LOW | `updateAgenda` mengosongkan `publishAt` saat status diubah ke `draft`/`archived` → jadwal yang sudah diisi harus diketik ulang. Kini `publishAt` hanya ditulis untuk `scheduled`/`published`; draft/archived mempertahankan nilai lama. | SELESAI | d8f615a |
+| R6 | MEDIUM | Agenda yang dijadwalkan **sebelum** A3 menyimpan jam WIB sebagai UTC → tampil +7 jam di form edit dan bergeser 7 jam saat disimpan ulang. Tersedia skrip migrasi idempoten `scripts/fix-publish-at-wib.ts`. | SELESAI (skrip) | 54aada9 |
+| R7 | LOW | `sanitize-html` ter-bundle ke browser lewat `RichTextEditor.tsx` → chunk editor ~204 KB. Kini sanitizer dimuat `import()` saat tab Preview diklik: chunk editor 204 KB → 4,4 KB, `sanitize.*.js` (204 KB) on-demand. | SELESAI | 891cf7d |
+
+**Tindakan operasional R6** (setelah merge + deploy fix A3):
+
+```bash
+npm run fix:publish-at-wib                 # dry-run: lihat daftar agenda & publish_at
+npm run fix:publish-at-wib -- --apply      # geser +7 jam + tulis penanda
+```
+
+Penanda `migration:publish-at-wib-v1` di `drive_cache` membuat skrip aman dijalankan ulang (tidak menggeser dua kali). Kalau tabel `agendas` belum punya baris dengan `publish_at`, cukup jalankan `--apply` sekali agar penandanya tertulis — pergeseran berikutnya tidak akan terjadi.
 
 Catatan (bukan defect): A4 sengaja menampilkan agenda `published` meski `eventDate` sudah lewat; `getAuthSecret()` fail-fast membuat seluruh request ber-cookie `access_token` ikut 500 bila `AUTH_SECRET` hilang; `checkOrigin: true` perlu diuji login di production setelah deploy (rekonstruksi origin di belakang proxy).
