@@ -104,8 +104,7 @@ src/
 │   ├── publikasi/
 │   ├── user/
 │   └── ...
-├── services/                  # Integrasi ke layanan eksternal
-│   └── whatsapp.service.ts
+├── services/                  # Barrel export service (posts, auth, agenda)
 ├── shared/                    # Layout, komponen reusable, utility umum
 │   ├── layouts/
 │   ├── ui/

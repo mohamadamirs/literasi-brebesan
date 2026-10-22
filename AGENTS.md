@@ -28,7 +28,6 @@
 | **Auth & Security** | **JWT (`jose`)** + Refresh Token DB | Cookie HTTP-only, rate limiter DB, guard di `src/middleware.ts` |
 | **Email Service** | **Resend API** | Reset password & notifikasi kontak |
 | **Docs Storage** | **Google Drive API** | Service account + caching di model `DriveCache` (`src/features/docs/googleDrive.ts`) |
-| **Notifikasi** | **WhatsApp Gateway** (opsional) | Non-blocking, fail-silent (`src/services/whatsapp.service.ts`) |
 | **Testing** | **Vitest** (jsdom) | Unit test services, utils, cron |
 | **Package Engine** | **Node.js** (lokal) / **Bun** (build pipeline) | Di lokal selalu gunakan perintah `npm` |
 
@@ -91,7 +90,7 @@
 * `About.astro`: Visi, misi, latar belakang komunitas.
 * `Stats.astro`: Statistik dinamis (total publikasi, penulis aktif, agenda terlaksana).
 * `CopyAccount.tsx`: Tombol salin nomor rekening donasi ke clipboard.
-* `contact.ts`: Server action `sendContact` (Resend + honeypot `hp` + notifikasi WhatsApp non-blocking).
+* `contact.ts`: Server action `sendContact` (Resend + honeypot `hp`).
 
 #### 6. `features/posts/` (Publikasi, Artikel, & Editor)
 * `posts.service.ts`: Query Prisma dengan paginasi, pencarian judul/konten, filter kategori, slug otomatis dengan sufiks acak 5 karakter, sanitisasi HTML (`sanitize-options`), GC gambar ImageKit saat artikel dihapus.
@@ -160,7 +159,6 @@
 * `src/shared/utils/cron-auth.ts`: Validasi `Authorization: Bearer <CRON_SECRET>`, fail-closed.
 * `src/shared/utils/constants.ts`: `CONTACT_INFO` (email, telepon, WhatsApp, Instagram, Facebook).
 * `src/shared/utils/utils.ts`: `generateSlug` (dengan sufiks acak), `stripHtml`, `truncateText`, `formatDate` (id-ID).
-* `src/services/whatsapp.service.ts`: Klien WhatsApp Gateway (`sendText`, `sendMedia`, notifikasi kontak/artikel/agenda). Opsional, fail-silent.
 * `src/services/index.ts`: Barrel export service.
 * `src/test-mocks/astro.ts`: Mock modul `astro:actions` & `astro:schema` untuk Vitest.
 

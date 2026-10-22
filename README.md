@@ -20,7 +20,7 @@ Platform web komunitas literasi di Brebes: publikasi karya penulis lokal dengan 
 - Arsip publikasi: pencarian realtime, filter kategori, paginasi.
 - Halaman detail artikel SEO-ready (OpenGraph, sitemap dinamis).
 - Galeri dokumentasi Google Drive dengan navigasi hirarki Tahun → Bulan → Kegiatan → Berkas.
-- Form kontak dengan honeypot anti-bot dan notifikasi WhatsApp ke admin (jika gateway aktif).
+- Form kontak dengan honeypot anti-bot dan pengiriman email via Resend.
 
 ### ✍️ Penulis (User, `role: "user"`)
 - Daftar / masuk / reset kata sandi via email.
@@ -42,8 +42,7 @@ Platform web komunitas literasi di Brebes: publikasi karya penulis lokal dengan 
 Browser ──▶ src/middleware.ts ──▶ Pages (Astro SSR) ──▶ Server Actions ──▶ Services ──▶ Prisma ──▶ TiDB
                  │                     │                     │
                  │                     ├─ Preact Islands      ├─ ImageKit (upload/hapus gambar)
-                 │                     │  (client:load)       ├─ Resend (email)
-                 │                     │                      └─ WhatsApp Gateway (opsional, non-blocking)
+                 │                     │  (client:load)       └─ Resend (email)
                  └─ JWT verify / refresh rotation
 ```
 
@@ -96,7 +95,6 @@ Penulis: draft ──submit──▶ pending ──(admin)──▶ published
 | Auth | **JWT (`jose`)** + refresh token DB | bcryptjs untuk hash password |
 | Email | **Resend API** | Reset password, notifikasi kontak |
 | Arsip docs | **Google Drive API** | Service account + cache DB |
-| Notifikasi | **WhatsApp Gateway** (opsional) | Non-blocking, fail-silent jika gateway mati |
 | Testing | **Vitest** (jsdom) | Unit test service & utilitas |
 | Runtime | Node.js (lokal) / Bun (build pipeline) | Perintah lokal selalu `npm` |
 
@@ -117,7 +115,7 @@ src/
 │   ├── admin/ user/ publikasi/ dokumentasi/ p/
 │   ├── api/                  # upload-image, posts, agendas, drive-*, cron/*
 │   └── (auth pages, kontak, logout, sitemap.xml.ts)
-├── services/                 # whatsapp.service.ts (integrasi eksternal)
+├── services/                 # Barrel export service (posts, auth, agenda)
 ├── shared/
 │   ├── layouts/              # Layout, DashboardLayout, Header, Footer
 │   ├── ui/                   # ActionFeedback, Pagination, Icon, ScrollToTop
@@ -166,7 +164,6 @@ Lihat [`.env.example`](.env.example) untuk template lengkap.
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Email reset password & kontak |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_PRIVATE_KEY` / `GOOGLE_DRIVE_ROOT_FOLDER_ID` | Arsip dokumentasi Drive |
 | `CRON_SECRET` | Proteksi endpoint `/api/cron/*` |
-| `WA_GATEWAY_URL` / `WA_GATEWAY_SECRET` / `WA_ADMIN_PHONE` | **Opsional.** Notifikasi WhatsApp (nonaktif jika kosong) |
 
 > Catatan: `package.json` dan `prisma/schema.prisma` memakai **`DATABASE_URL` (MySQL/TiDB)**. Beberapa referensi `POSTGRES_URL` lama di `.env.example` sudah tidak dipakai.
 
@@ -191,7 +188,6 @@ npx prisma generate      # Regenerasi Prisma Client setelah ubah skema
 ## 11. Catatan Implementasi
 
 - **`drive_cache` ganda fungsi:** selain cache Google Drive, tabel ini menjadi penyimpanan rate limiter (entri prefix `rl:`). Cleanup otomatis berjalan 1% sampling per pengecekan.
-- **WhatsApp opsional:** semua notifikasi WhatsApp non-blocking (`.catch` log saja) — gateway mati tidak merusak request utama.
 - **Slug artikel:** `generateSlug()` menambahkan sufiks acak 5 karakter untuk menghindari konflik judul antar penulis.
 - **Shortlink:** `/p/<postId>` redirect ke `/publikasi/<slug>` untuk artikel published.
 

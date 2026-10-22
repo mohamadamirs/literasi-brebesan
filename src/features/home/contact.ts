@@ -2,7 +2,6 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro:schema";
 import { Resend } from "resend";
 import sanitizeHtml from "sanitize-html";
-import { whatsappService } from "@/services/whatsapp.service";
 
 export const contactActions = {
   sendContact: defineAction({
@@ -60,16 +59,6 @@ export const contactActions = {
           console.error("Resend error:", error);
           throw new Error("Gagal mengirim pesan. Silakan coba lagi nanti.");
         }
-
-        // Kirim notifikasi WhatsApp ke Admin secara non-blocking
-        whatsappService
-          .notifyContactMessage({
-            name: input.name,
-            email: input.email,
-            subject: input.subject,
-            message: sanitizedMessage,
-          })
-          .catch((err) => console.warn("[WA Contact Notification Failed]", err));
 
         return { success: true, message: "Pesan berhasil dikirim!" };
       } catch (err) {

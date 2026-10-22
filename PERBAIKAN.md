@@ -35,9 +35,9 @@ bukti runtime/DB.
 | :-- | :-- | :-- | :-- | :-- |
 | B1 | CRITICAL | `RESEND_API_KEY` kosong → **seluruh aplikasi gagal boot**. `new Resend(undefined)` di module scope `src/features/home/contact.ts:7` throw `Error: Missing API key...`, dan `src/actions/index.ts` meng-import modul itu → semua route 500. | TERJADI | - |
 | B2 | HIGH | `AUTH_SECRET` kosong → login/middleware mati tanpa pesan jelas. `jwt.ts:5-8` `new TextEncoder().encode(undefined)` = 0 byte → jose `DOMException: Zero-length key is not supported`. Tidak ada guard fail-fast. | TERJADI | - |
-| B3 | HIGH | Notifikasi WhatsApp "artikel terbit" mengirim slug salah: `posts.ts` `slug: input.id` → link `literasibrebesan.my.id/publikasi/<postId>` → 404. | TERJADI | - |
-| B4 | MEDIUM | `notifyArticleSubmitted` nama penulis selalu `"Penulis"`: memakai `(user as any).name \|\| (user as any).email`, padahal `locals.user` = `{id, role, fullName, avatarUrl}`. | TERJADI | - |
-| B5 | MEDIUM | `notifyAgendaPublished` tidak pernah dipanggil (dead code) → notifikasi agenda terbit tidak dikirim. | TERJADI | - |
+| B3 | HIGH | Notifikasi WhatsApp "artikel terbit" mengirim slug salah: `posts.ts` `slug: input.id` → link `literasibrebesan.my.id/publikasi/<postId>` → 404. | TIDAK BERLAKU — integrasi WA dihapus | - |
+| B4 | MEDIUM | `notifyArticleSubmitted` nama penulis selalu `"Penulis"`: memakai `(user as any).name \|\| (user as any).email`, padahal `locals.user` = `{id, role, fullName, avatarUrl}`. | TIDAK BERLAKU — integrasi WA dihapus | - |
+| B5 | MEDIUM | `notifyAgendaPublished` tidak pernah dipanggil (dead code) → notifikasi agenda terbit tidak dikirim. | TIDAK BERLAKU — integrasi WA dihapus | - |
 | B6 | MEDIUM | Preview editor render HTML mentah (`dangerouslySetInnerHTML` tanpa sanitasi client-side) → self-XSS di browser penulis. | TERJADI | - |
 | B7 | MEDIUM | `set:html={post.content}` tanpa sanitasi ulang saat render (`publikasi/[slug].astro`, `admin/posts/[id].astro`). Aman selama write-path sanitize, tapi `scripts/sync-db-imagekit.ts:128` menulis `content` tanpa sanitize. | TERJADI | - |
 | B8 | MEDIUM | `security.checkOrigin: false` di `astro.config.mjs` → proteksi CSRF Astro dimatikan; hanya tertahan SameSite=Lax cookie. | TERJADI | - |
@@ -67,3 +67,11 @@ bukti runtime/DB.
 - `/root/Documents` adalah mount f2fs (Android shared storage) tanpa izin exec → binary `node_modules` gagal dijalankan (`EACCES`).
 - Sandbox verifikasi: `/tmp/opencode/lb` (salinan repo + `npm install --force`).
 - Tidak ada `DATABASE_URL`/MySQL lokal → perilaku query DB diuji lewat mock Prisma, bukan DB nyata.
+
+---
+
+## E. Keputusan Produk
+
+- **Integrasi WhatsApp Gateway dihapus** (permintaan pemilik): file `src/services/whatsapp.service.ts` dihapus, pemanggilan di `src/features/posts/posts.ts` & `src/features/home/contact.ts` dibuang, export barrel `src/services/index.ts` diperbarui, env `WA_GATEWAY_*`/`WA_ADMIN_PHONE` dihapus dari `.env.example`, dan dokumentasi (`README.md`, `AGENTS.md`, `TECH_DESIGN.md`) diperbarui.
+- **Tetap dipertahankan:** link WhatsApp sosial di `CONTACT_INFO.whatsapp` (`wa.me/...`) dan tombol share WhatsApp di halaman artikel — itu tautan kontak, bukan integrasi gateway.
+- Temuan **B3/B4/B5** tidak lagi relevan karena kodenya dihapus.
