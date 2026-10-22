@@ -65,6 +65,12 @@ export const postActions = {
         return { success: true };
       } catch (e: any) {
         console.error("Update post error:", e);
+        if (e.code === "NOT_FOUND") {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: e.message,
+          });
+        }
         throw new ActionError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Gagal memperbarui tulisan.",
@@ -85,9 +91,9 @@ export const postActions = {
         });
       }
 
+      let result: { success: boolean };
       try {
-        await postsService.deletePost(input.id, user.id, user.role);
-        return { success: true };
+        result = await postsService.deletePost(input.id, user.id, user.role);
       } catch (e: any) {
         console.error("Delete post error:", e);
         throw new ActionError({
@@ -95,6 +101,16 @@ export const postActions = {
           message: "Gagal menghapus tulisan.",
         });
       }
+
+      // deleteMany 0 baris = bukan pemilik / sudah dihapus: jangan lapor sukses.
+      if (!result.success) {
+        throw new ActionError({
+          code: "NOT_FOUND",
+          message: "Tulisan tidak ditemukan atau bukan milik Anda.",
+        });
+      }
+
+      return { success: true };
     },
   }),
 

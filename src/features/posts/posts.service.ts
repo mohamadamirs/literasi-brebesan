@@ -242,7 +242,11 @@ export const postsService = {
       });
       // 0 baris = post tidak ada atau bukan milik penulis → jangan diam-diam sukses.
       if (result.count === 0) {
-        throw new Error("Post not found");
+        const notFound: any = new Error(
+          "Tulisan tidak ditemukan atau bukan milik Anda."
+        );
+        notFound.code = "NOT_FOUND";
+        throw notFound;
       }
     }
     return { success: true };

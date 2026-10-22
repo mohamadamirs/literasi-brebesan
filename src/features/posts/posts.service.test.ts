@@ -370,7 +370,7 @@ describe("postsService", () => {
           "user",
           "user-2",
         ),
-      ).rejects.toThrow("Post not found");
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
 
     it("should not update slug if post was already published", async () => {
