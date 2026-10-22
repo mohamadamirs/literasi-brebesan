@@ -73,6 +73,38 @@ describe("deleteFromImageKitByUrl", () => {
     expect(mockDeleteFile).not.toHaveBeenCalled();
   });
 
+  it("mencari file di subfolder (upload artikel memakai /<userId>/<YYYY-MM>/)", async () => {
+    mockListFiles.mockResolvedValueOnce([
+      {
+        fileId: "fid-3",
+        url: "https://ik.imagekit.io/literasibrebesan/posts/u1/2026-10/a.png",
+      },
+    ]);
+
+    await deleteFromImageKitByUrl(
+      "https://ik.imagekit.io/literasibrebesan/posts/u1/2026-10/a.png",
+      "literasibrebesan/posts/u1",
+    );
+
+    expect(mockListFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/literasibrebesan/posts/u1/2026-10",
+        searchQuery: 'name="a.png"',
+      }),
+    );
+    expect(mockDeleteFile).toHaveBeenCalledWith("fid-3");
+  });
+
+  it("tidak menghapus file milik user lain walau di folder yang sama", async () => {
+    await deleteFromImageKitByUrl(
+      "https://ik.imagekit.io/literasibrebesan/posts/u2/a.png",
+      "literasibrebesan/posts/u1",
+    );
+
+    expect(mockListFiles).not.toHaveBeenCalled();
+    expect(mockDeleteFile).not.toHaveBeenCalled();
+  });
+
   it("tidak menghapus file yang tidak ada di hasil pencarian", async () => {
     mockListFiles.mockResolvedValueOnce([]);
 

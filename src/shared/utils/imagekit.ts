@@ -73,28 +73,37 @@ export async function deleteFromImageKitByUrl(
     if (!urlEndpoint) return;
 
     const endpoint = new URL(urlEndpoint);
-    const folderPath = allowedFolder.replace(/^\/+|\/+$/g, "");
-    const rawFileName = urlObj.pathname.split("/").pop() || "";
-    if (!rawFileName || !/^[a-zA-Z0-9._%-]+$/.test(rawFileName)) return;
+    const segments = urlObj.pathname.split("/").filter(Boolean);
+    if (segments.length < 2) return;
+    const rawFileName = segments[segments.length - 1];
+    if (!/^[a-zA-Z0-9._%-]+$/.test(rawFileName)) return;
 
-    // Folder whitelist: file harus berada LANGSUNG di folder yang diizinkan.
-    // Path dicek dari URL, bukan dari URL endpoint, karena endpoint bisa saja
-    // sudah memuat segmen folder (mis. https://ik.imagekit.io/literasibrebesan).
-    const allowedPrefix = `/${folderPath}/`;
-    if (
-      urlObj.origin !== endpoint.origin ||
-      !urlObj.pathname.endsWith(`${allowedPrefix}${rawFileName}`)
-    ) {
+    // Folder whitelist: file harus berada DI DALAM folder yang diizinkan.
+    // Subfolder tetap boleh (upload artikel memakai /<userId>/<YYYY-MM>/),
+    // jadi pencocokan per segmen, bukan prefix path URL. Segmen juga aman
+    // untuk endpoint yang sudah memuat segmen folder
+    // (mis. https://ik.imagekit.io/literasibrebesan).
+    const allowedSegments = allowedFolder
+      .replace(/^\/+|\/+$/g, "")
+      .split("/")
+      .filter(Boolean);
+    if (allowedSegments.length === 0) return;
+    const parentSegments = segments.slice(0, -1);
+    const allowedIndex = parentSegments.findIndex((_, index) =>
+      allowedSegments.every((seg, offset) => parentSegments[index + offset] === seg),
+    );
+    if (urlObj.origin !== endpoint.origin || allowedIndex === -1) {
       return;
     }
 
     const fileName = decodeURIComponent(rawFileName);
+    // Folder tempat file benar-benar berada, dipakai untuk mempersempit
+    // pencarian: tanpa ini file dengan nama sama di folder lain bisa memenuhi
+    // hasil, dan limit default bisa memotong file yang mau dihapus.
+    const parentPath = `/${parentSegments.join("/")}`;
 
     const files = await ik.listFiles({
-      // Batasi ke folder yang diizinkan + limit eksplisit: tanpa ini file dengan
-      // nama sama di folder lain bisa memenuhi hasil, dan limit default bisa
-      // memotong file yang sebenarnya mau dihapus (storage leak).
-      path: `/${folderPath}`,
+      path: parentPath,
       searchQuery: `name="${fileName}"`,
       limit: 1000,
     });
