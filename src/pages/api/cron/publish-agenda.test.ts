@@ -84,7 +84,7 @@ describe("publish-agenda cron", () => {
 
     expect(response.status).toBe(200);
     expect(mockPrisma.$transaction).toHaveBeenCalledOnce();
-    expect(mockUpdateMany).toHaveBeenCalledTimes(3);
+    expect(mockUpdateMany).toHaveBeenCalledTimes(2);
     expect(mockUpdateMany).toHaveBeenNthCalledWith(1, {
       where: {
         id: dueAgenda.id,
@@ -97,14 +97,18 @@ describe("publish-agenda cron", () => {
       where: { status: "published", id: { not: dueAgenda.id } },
       data: { status: "archived" },
     });
-    expect(mockUpdateMany).toHaveBeenNthCalledWith(3, {
-      where: {
-        status: "scheduled",
-        publishAt: { lte: dueAgenda.publishAt },
-        id: { not: dueAgenda.id },
-      },
-      data: { status: "archived" },
-    });
+  });
+
+  it("mengambil agenda due paling awal (publishAt asc) agar agenda tertua tidak dilewati", async () => {
+    mockPrisma.agenda.findFirst.mockResolvedValueOnce(dueAgenda);
+
+    await GET(createContext());
+
+    expect(mockPrisma.agenda.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { publishAt: "asc" },
+      }),
+    );
   });
 
   it("does not archive anything when another cron has already claimed the agenda", async () => {

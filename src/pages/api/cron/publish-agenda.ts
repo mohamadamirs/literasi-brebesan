@@ -15,7 +15,9 @@ export const GET: APIRoute = async ({ request }) => {
 
   try {
     // 1. Cari agenda yang statusnya 'scheduled' dan sudah waktunya tayang.
-    // Kita ambil yang paling baru (publish_at paling besar) untuk diterbitkan.
+    // Ambil yang paling AWAL (publish_at terkecil) supaya agenda tertua
+    // tidak dilewati. Sebelumnya urut 'desc' mengambil agenda due terakhir
+    // dan mengarsipkan sisanya sehingga agenda tertua hilang tanpa tayang.
     const now = new Date();
     const readyToPublish = await prisma.agenda.findFirst({
       where: {
@@ -25,7 +27,7 @@ export const GET: APIRoute = async ({ request }) => {
         },
       },
       orderBy: {
-        publishAt: 'desc',
+        publishAt: 'asc',
       },
     });
 
@@ -48,6 +50,7 @@ export const GET: APIRoute = async ({ request }) => {
 
       if (claim.count === 0) return false;
 
+      // Invariant: hanya satu agenda yang published. Sisanya diarsipkan.
       await tx.agenda.updateMany({
         where: {
           status: "published",
@@ -56,16 +59,9 @@ export const GET: APIRoute = async ({ request }) => {
         data: { status: "archived" },
       });
 
-      if (readyToPublish.publishAt) {
-        await tx.agenda.updateMany({
-          where: {
-            status: "scheduled",
-            publishAt: { lte: readyToPublish.publishAt },
-            id: { not: readyToPublish.id },
-          },
-          data: { status: "archived" },
-        });
-      }
+      // Agenda scheduled lain yang juga sudah due TIDAK diarsipkan di sini:
+      // mereka menunggu giliran pada eksekusi cron berikutnya sehingga tidak
+      // ada agenda yang dilewati tanpa pernah tayang.
 
       return true;
     });

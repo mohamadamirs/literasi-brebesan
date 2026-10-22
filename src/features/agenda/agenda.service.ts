@@ -35,14 +35,11 @@ export interface UpdateAgendaData extends CreateAgendaData {
 
 export const agendaService = {
   async getUpcomingAgendas(limit: number = 1): Promise<AgendaItem[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+    // Hanya agenda berstatus "published" yang tayang di publik. Filter
+    // eventDate >= today pernah membuat agenda yang sudah tayang (tanggal
+    // lewat) hilang dari beranda padahal statusnya published.
     const agendas = await prisma.agenda.findMany({
       where: {
-        eventDate: {
-          gte: today,
-        },
         status: "published",
       },
       orderBy: {
@@ -89,15 +86,12 @@ export const agendaService = {
   },
 
   async checkPublishedConflict(excludeId?: string): Promise<AgendaItem | null> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+    // Invariant: hanya satu agenda berstatus "published" pada satu waktu.
+    // Filter eventDate >= today dulu membuat agenda bertanggal lampau
+    // tidak dianggap konflik sehingga DB bisa punya lebih dari satu published.
     const conflict = await prisma.agenda.findFirst({
       where: {
         status: "published",
-        eventDate: {
-          gte: today,
-        },
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },
     });

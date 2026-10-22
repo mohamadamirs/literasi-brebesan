@@ -47,7 +47,11 @@ describe("agendaService", () => {
 
       const result = await agendaService.getUpcomingAgendas(1);
 
-      expect(prisma.agenda.findMany).toHaveBeenCalled();
+      expect(prisma.agenda.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: "published" },
+        }),
+      );
       expect(result).toEqual([
         {
           id: "agenda-1",
@@ -106,6 +110,16 @@ describe("agendaService", () => {
       const result = await agendaService.checkPublishedConflict();
 
       expect(result).toBeNull();
+    });
+
+    it("shouldconsider published agenda with past eventDate as conflict", async () => {
+      (prisma.agenda.findFirst as any).mockResolvedValueOnce(null);
+
+      await agendaService.checkPublishedConflict();
+
+      expect(prisma.agenda.findFirst).toHaveBeenCalledWith({
+        where: { status: "published" },
+      });
     });
   });
 
