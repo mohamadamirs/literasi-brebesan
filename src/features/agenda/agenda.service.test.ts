@@ -320,6 +320,45 @@ describe("agendaService", () => {
       expect(prisma.agenda.update).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
+
+    it("mempertahankan publishAt saat status diturunkan ke draft/archived", async () => {
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
+
+      await agendaService.updateAgenda("a1", {
+        title: "Agenda Diarsipkan",
+        description: "Desc",
+        event_date: "2026-10-02",
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/12345",
+        status: "archived",
+      });
+
+      const updateArg = (prisma.agenda.update as any).mock.calls[0][0];
+      expect(updateArg.data.status).toBe("archived");
+      // Jadwal yang sudah diisi tidak boleh ikut terhapus.
+      expect(updateArg.data).not.toHaveProperty("publishAt");
+    });
+
+    it("menyimpan jadwal WIB sebagai UTC saat status scheduled", async () => {
+      (prisma.agenda.update as any).mockResolvedValueOnce({});
+
+      await agendaService.updateAgenda("a1", {
+        title: "Agenda Terjadwal",
+        description: "Desc",
+        event_date: "2026-10-02",
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/12345",
+        status: "scheduled",
+        publish_at: "2026-10-25T10:00",
+      });
+
+      const updateArg = (prisma.agenda.update as any).mock.calls[0][0];
+      expect(updateArg.data.publishAt.toISOString()).toBe(
+        "2026-10-25T03:00:00.000Z",
+      );
+    });
   });
 
   describe("deleteAgenda and quickPublishAgenda", () => {

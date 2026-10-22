@@ -278,8 +278,13 @@ export const agendaService = {
       location: data.location,
       waLink: data.wa_link,
       status: data.status,
-      publishAt: publishTime,
     };
+
+    // draft/archived: publishAt dibiarkan apa adanya. Jadwal yang sudah diisi
+    // tidak boleh hilang hanya karena agenda sementara diturunkan dari tayang.
+    if (publishTime !== null) {
+      updateData.publishAt = publishTime;
+    }
 
     if (data.image_url !== undefined) {
       updateData.imageUrl = data.image_url;
