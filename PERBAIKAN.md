@@ -72,7 +72,11 @@ bukti runtime/DB.
 
 ## D2. Verifikasi Production (2026-10-22)
 
-Konfirmasi pemilik: **seluruh environment variable sudah terpasang di Vercel** (`DATABASE_URL`, `AUTH_SECRET`, `IMAGEKIT_*`, `RESEND_*`, `GOOGLE_*`, `CRON_SECRET`).
+Konfirmasi pemilik: environment variable sudah terpasang di Vercel (`DATABASE_URL`, `AUTH_SECRET`, `IMAGEKIT_*`, `RESEND_*`, `GOOGLE_*`) — **kecuali `CRON_SECRET` yang ternyata belum ada** (endpoint 401 tidak membuktikan secret terpasang: `verifyCronRequest` fail-closed mengembalikan 401 yang sama saat secret kosong maupun salah).
+
+Tindakan 2026-10-22: secret baru dibuat (`openssl rand -base64 32`) dan dipasang:
+- GitHub repository secret `CRON_SECRET` (aman untuk repo publik — terenkripsi, tidak terbaca publik/fork) — sudah aktif.
+- Vercel project env `CRON_SECRET` — **perlu dipasang manual via dashboard/CLI**, lalu redeploy. Nilai sama dengan yang di GitHub secret.
 
 | Cek (kode yang sekarang live, sebelum PR ini) | Hasil | Catatan |
 | :-- | :-- | :-- |
@@ -81,7 +85,7 @@ Konfirmasi pemilik: **seluruh environment variable sudah terpasang di Vercel** (
 | `GET /api/posts?limit=9` | 200 | JSON artikel tampil |
 | `GET /api/posts?limit=abc` | **500** | Bukti langsung temuan **B9** (NaN → Prisma error) — sudah diperbaiki di 11ce7c2 |
 | `GET /api/posts?limit=999` | 200 | Tanpa batas maksimum (bagian B9) — sudah diperbaiki di 11ce7c2 |
-| `GET /api/cron/publish-agenda` tanpa token | 401 `Unauthorized` | Fail-closed bekerja; `CRON_SECRET` ada di Vercel |
+| `GET /api/cron/publish-agenda` tanpa token | 401 `Unauthorized` | Fail-closed bekerja (bukan bukti secret terpasang) |
 | `GET /api/cron/cleanup-sessions` tanpa token | 401 `Unauthorized` | Sama |
 | `GET /sitemap.xml` | 200 | Sitemap dinamis normal |
 | `GET /api/agendas` | 200 `null` | By design: tidak ada agenda `published` saat ini (`agendas[0] \|\| null`) |
