@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripHtml, truncateText, truncateTitle, extractFirstImage } from "@/shared/utils/utils";
+import { stripHtml, truncateText, truncateTitle, extractFirstImage, parseWibDateTime, formatWibDateTime } from "@/shared/utils/utils";
 
 describe('Utility Functions', () => {
   describe('stripHtml', () => {
@@ -46,6 +46,28 @@ describe('Utility Functions', () => {
     it('should handle case-insensitive and extra spaces', () => {
       const input = '<IMG   SRC="case.png" >';
       expect(extractFirstImage(input)).toBe('case.png');
+    });
+  });
+
+  describe('WIB datetime', () => {
+    it('should treat datetime-local value as WIB and convert to UTC', () => {
+      const result = parseWibDateTime('2026-10-25T10:00');
+      expect(result.toISOString()).toBe('2026-10-25T03:00:00.000Z');
+    });
+
+    it('should format a UTC date back to WIB datetime-local value', () => {
+      const result = formatWibDateTime(new Date('2026-10-25T03:00:00.000Z'));
+      expect(result).toBe('2026-10-25T10:00');
+    });
+
+    it('should round-trip WIB datetime-local value', () => {
+      expect(formatWibDateTime(parseWibDateTime('2026-01-31T23:45'))).toBe(
+        '2026-01-31T23:45',
+      );
+    });
+
+    it('should return empty string for null value', () => {
+      expect(formatWibDateTime(null)).toBe('');
     });
   });
 });

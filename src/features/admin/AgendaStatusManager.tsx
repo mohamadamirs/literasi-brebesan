@@ -1,10 +1,11 @@
 import { useState } from 'preact/hooks';
+import { formatWibDateTime } from '@/shared/utils/utils';
 
 export type AgendaStatus = 'draft' | 'published' | 'scheduled' | 'archived';
 
 interface Props {
   initialStatus: AgendaStatus;
-  initialPublishAt: string | null;
+  initialPublishAt: string | Date | null;
 }
 
 export default function AgendaStatusManager({ initialStatus, initialPublishAt }: Props) {
@@ -71,7 +72,7 @@ export default function AgendaStatusManager({ initialStatus, initialPublishAt }:
           <input 
             type="datetime-local" 
             name="publish_at" 
-            value={initialPublishAt ? new Date(initialPublishAt).toISOString().slice(0, 16) : ''}
+            value={formatWibDateTime(initialPublishAt)}
             required
             class="w-full px-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] font-bold text-slate-700 outline-none focus:border-amber-500 transition-all shadow-sm"
           />

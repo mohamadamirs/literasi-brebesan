@@ -130,6 +130,29 @@ describe("agendaService", () => {
       expect(result).toEqual({ success: true });
     });
 
+    it("should store publish_at as UTC (input datetime-local dibaca sebagai WIB)", async () => {
+      (prisma.agenda.create as any).mockResolvedValueOnce({ id: "new-id" });
+
+      await agendaService.createAgenda({
+        title: "Scheduled Agenda",
+        description: "Description 10 chars",
+        event_date: "2026-10-25",
+        event_time: "10:00",
+        location: "Brebes",
+        wa_link: "https://wa.me/12345",
+        status: "scheduled",
+        publish_at: "2026-10-25T10:00",
+      });
+
+      expect(prisma.agenda.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            publishAt: new Date("2026-10-25T03:00:00.000Z"),
+          }),
+        }),
+      );
+    });
+
     it("should throw conflict error if published agenda exists and override is false", async () => {
       // 1. check conflict -> exists
       (prisma.agenda.findFirst as any).mockResolvedValueOnce({

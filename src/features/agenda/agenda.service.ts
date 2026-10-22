@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { v4 as uuidv4 } from "uuid";
+import { parseWibDateTime } from "@/shared/utils/utils";
 
 export interface AgendaItem {
   id: string;
@@ -160,7 +161,7 @@ export const agendaService = {
         error.code = "BAD_REQUEST";
         throw error;
       }
-      publishTime = new Date(data.publish_at);
+      publishTime = parseWibDateTime(data.publish_at);
     } else if (data.status === "published") {
       publishTime = new Date();
     }
@@ -212,7 +213,7 @@ export const agendaService = {
         error.code = "BAD_REQUEST";
         throw error;
       }
-      publishTime = new Date(data.publish_at);
+      publishTime = parseWibDateTime(data.publish_at);
     } else if (data.status === "published") {
       publishTime = new Date();
     }
