@@ -1,7 +1,9 @@
 import { useState } from 'preact/hooks';
 
+export type AgendaStatus = 'draft' | 'published' | 'scheduled' | 'archived';
+
 interface Props {
-  initialStatus: 'draft' | 'published' | 'scheduled';
+  initialStatus: AgendaStatus;
   initialPublishAt: string | null;
 }
 
@@ -47,6 +49,18 @@ export default function AgendaStatusManager({ initialStatus, initialPublishAt }:
             onChange={() => setStatus('published')}
           />
           <div class="text-center py-3 rounded-xl md:rounded-full text-[11px] font-black uppercase text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white transition-all">Tayang</div>
+        </label>
+
+        <label class="flex-1 min-w-[100px] cursor-pointer">
+          <input 
+            type="radio" 
+            name="status" 
+            value="archived" 
+            class="peer hidden" 
+            checked={status === 'archived'} 
+            onChange={() => setStatus('archived')}
+          />
+          <div class="text-center py-3 rounded-xl md:rounded-full text-[11px] font-black uppercase text-slate-500 peer-checked:bg-slate-700 peer-checked:text-white transition-all">Arsip</div>
         </label>
       </div>
 
