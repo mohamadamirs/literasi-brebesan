@@ -7,85 +7,152 @@ import { actions, isActionError } from "astro:actions";
 
 const result = Astro.getActionResult(actions.sendContact);
 
-// Set SEO
 const title = "Kontak Kami - Literasi Brebesan";
 const description = "Hubungi Literasi Brebesan untuk kolaborasi, donasi buku, atau sekadar menyapa. Kami terbuka untuk diskusi dan pergerakan bersama.";
+
+const labelClass = "block text-[10px] font-black uppercase tracking-widest text-slate-500";
+const fieldClass = "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-50";
 ---
 
 <Layout title={title} description={description}>
   <Header />
-  
-  <main class="pt-32 pb-12 md:pt-44 md:pb-24 bg-slate-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      
-      <!-- Header Section -->
-      <div class="max-w-3xl mb-12 md:mb-20">
-        <h1 class="text-4xl md:text-6xl font-bold font-heading text-slate-950 mb-6 tracking-tight">
+
+  <main class="relative overflow-hidden bg-paper pt-32 pb-20 md:pt-44 md:pb-28">
+    <div class="mesh-bg" aria-hidden="true"></div>
+    <div class="absolute inset-0 grid-bg opacity-40" aria-hidden="true"></div>
+
+    <div class="section-shell relative">
+      <div class="max-w-3xl">
+        <div class="eyebrow border-blue-100 bg-white/70 text-blue-700 shadow-sm">
+          <span class="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true"></span>
+          Kontak
+        </div>
+
+        <h1 class="display-title mt-5 text-slate-950">
           Mari <span class="text-blue-600">Terhubung</span>
         </h1>
-        <p class="text-lg md:text-xl text-slate-600 leading-relaxed">
+
+        <p class="mt-5 max-w-2xl text-base leading-relaxed text-slate-600 md:text-lg">
           Punya pertanyaan, ide kolaborasi, atau ingin mendonasikan buku? Jangan ragu untuk menyapa kami. Kami akan merespons secepat mungkin.
         </p>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        
-        <!-- Info Column -->
-        <div class="lg:col-span-5 space-y-8">
-          <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-8">
+      <div class="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 md:mt-12 md:gap-5">
+        <a
+          href={CONTACT_INFO.whatsapp}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="group flex items-center justify-between gap-4 rounded-[2rem] border border-green-100 bg-white/80 p-5 shadow-sm backdrop-blur transition-all hover:-translate-y-1 hover:border-green-200 hover:shadow-lift md:p-6"
+        >
+          <div class="flex items-center gap-4">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-600">
+              <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+            </span>
             <div>
-              <h3 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Informasi Kontak</h3>
-              <div class="space-y-6">
-                <div class="flex items-start gap-4">
-                  <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p class="font-bold text-slate-900 mb-1">Email</p>
-                    <a href={`mailto:${CONTACT_INFO.email}`} class="text-slate-600 hover:text-blue-600 transition-colors">{CONTACT_INFO.email}</a>
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">WhatsApp</p>
+              <p class="mt-1 text-sm font-black text-slate-900 md:text-base">{CONTACT_INFO.phone}</p>
+            </div>
+          </div>
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-400 transition-all group-hover:border-green-600 group-hover:bg-green-600 group-hover:text-white">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M17 7H8M17 7v9" /></svg>
+          </span>
+        </a>
+
+        <a
+          href={`mailto:${CONTACT_INFO.email}`}
+          class="group flex items-center justify-between gap-4 rounded-[2rem] border border-blue-100 bg-white/80 p-5 shadow-sm backdrop-blur transition-all hover:-translate-y-1 hover:border-blue-200 hover:shadow-lift md:p-6"
+        >
+          <div class="flex items-center gap-4">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</p>
+              <p class="mt-1 truncate text-sm font-black text-slate-900 md:text-base">{CONTACT_INFO.email}</p>
+            </div>
+          </div>
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-400 transition-all group-hover:border-blue-600 group-hover:bg-blue-600 group-hover:text-white">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M17 7H8M17 7v9" /></svg>
+          </span>
+        </a>
+      </div>
+
+      <div class="mt-8 grid grid-cols-1 items-start gap-8 lg:mt-12 lg:grid-cols-12 lg:gap-10">
+        <div class="lg:col-span-5">
+          <div class="glass-panel space-y-8 rounded-[2rem] p-6 shadow-sm md:p-8 lg:sticky lg:top-28">
+            <div>
+              <h2 class="text-sm font-black uppercase tracking-widest text-blue-600">Informasi Kontak</h2>
+
+              <div class="mt-5 space-y-5">
+                <div class="flex items-start gap-3.5">
+                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</p>
+                    <a href={`mailto:${CONTACT_INFO.email}`} class="mt-1 block break-words text-sm font-bold text-slate-700 transition-colors hover:text-blue-600">{CONTACT_INFO.email}</a>
                   </div>
                 </div>
 
-                <div class="flex items-start gap-4">
-                  <div class="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 shrink-0">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                    </svg>
-                  </div>
+                <div class="flex items-start gap-3.5">
+                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+                  </span>
                   <div>
-                    <p class="font-bold text-slate-900 mb-1">WhatsApp</p>
-                    <a href={CONTACT_INFO.whatsapp} target="_blank" class="text-slate-600 hover:text-green-600 transition-colors">{CONTACT_INFO.phone}</a>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">WhatsApp</p>
+                    <a href={CONTACT_INFO.whatsapp} target="_blank" rel="noopener noreferrer" class="mt-1 block text-sm font-bold text-slate-700 transition-colors hover:text-green-600">{CONTACT_INFO.phone}</a>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-3.5">
+                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                  </span>
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Lokasi</p>
+                    <p class="mt-1 text-sm font-bold text-slate-700">Brebes, Jawa Tengah</p>
+                    <p class="mt-0.5 text-xs text-slate-500">Kegiatan berpindah-pindah</p>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-3.5">
+                  <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path stroke-linecap="round" d="M12 7v5l3 2" /></svg>
+                  </span>
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Waktu respons</p>
+                    <p class="mt-1 text-sm font-bold text-slate-700">±1×24 jam</p>
+                    <p class="mt-0.5 text-xs text-slate-500">Pada hari kerja</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="pt-8 border-t border-slate-100">
-              <h3 class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Media Sosial</h3>
-              <div class="flex gap-4">
+            <div class="border-t border-slate-200/70 pt-6">
+              <h2 class="text-sm font-black uppercase tracking-widest text-blue-600">Media Sosial</h2>
+              <div class="mt-4 flex gap-3">
                 {CONTACT_INFO.socials.map((social) => (
                   <a
                     href={social.href}
                     target="_blank"
-                    class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all"
+                    rel="noopener noreferrer"
+                    class="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:-translate-y-0.5 hover:border-blue-600 hover:bg-blue-600 hover:text-white"
                     aria-label={social.name}
                   >
                     {social.icon === 'instagram' && (
-                      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                         <rect height="20" rx="5" ry="5" width="20" x="2" y="2" />
                         <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
                         <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
                       </svg>
                     )}
                     {social.icon === 'facebook' && (
-                      <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
                       </svg>
                     )}
                     {social.icon === 'whatsapp' && (
-                      <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                       </svg>
                     )}
@@ -96,90 +163,63 @@ const description = "Hubungi Literasi Brebesan untuk kolaborasi, donasi buku, at
           </div>
         </div>
 
-        <!-- Form Column -->
         <div class="lg:col-span-7">
-          <div class="bg-white p-8 md:p-10 rounded-3xl border border-slate-200 shadow-sm">
-            
+          <div class="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-lift backdrop-blur md:p-9">
+            <h2 class="text-xl font-black text-slate-950 md:text-2xl">Kirim Pesan</h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-500">Isi formulir di bawah, kami akan membalas lewat email.</p>
+
             {result?.data?.success && (
-              <div class="mb-8 p-4 bg-green-50 border border-green-200 text-green-700 rounded-2xl flex items-center gap-3">
-                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <div role="status" class="mt-6 flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 text-green-700">
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p class="font-medium">{result.data.message}</p>
+                <p class="text-sm font-bold">{result.data.message}</p>
               </div>
             )}
 
             {isActionError(result) && (
-              <div class="mb-8 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl flex items-center gap-3">
-                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <div role="alert" class="mt-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p class="font-medium">{result.message}</p>
+                <p class="text-sm font-bold">{result.message}</p>
               </div>
             )}
 
-            <form action={actions.sendContact} method="POST" class="space-y-6">
-              <!-- Honeypot -->
+            <form action={actions.sendContact} method="POST" class="mt-6 space-y-5">
               <div class="hidden">
                 <label for="hp">Honeypot</label>
                 <input type="text" name="hp" id="hp" tabindex="-1" autocomplete="off" />
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div class="space-y-2">
-                  <label for="name" class="block text-sm font-bold text-slate-700 uppercase tracking-wider">Nama Lengkap</label>
-                  <input
-                    type="text"
-                    name="name"
-                    id="name"
-                    required
-                    placeholder="Masukkan nama Anda"
-                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                  />
+                  <label for="name" class={labelClass}>Nama Lengkap</label>
+                  <input type="text" name="name" id="name" required minlength="2" autocomplete="name" placeholder="Masukkan nama Anda" class={fieldClass} />
                 </div>
                 <div class="space-y-2">
-                  <label for="email" class="block text-sm font-bold text-slate-700 uppercase tracking-wider">Alamat Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    id="email"
-                    required
-                    placeholder="email@contoh.com"
-                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                  />
+                  <label for="email" class={labelClass}>Alamat Email</label>
+                  <input type="email" name="email" id="email" required autocomplete="email" inputmode="email" placeholder="email@contoh.com" class={fieldClass} />
                 </div>
               </div>
 
               <div class="space-y-2">
-                <label for="subject" class="block text-sm font-bold text-slate-700 uppercase tracking-wider">Subjek</label>
-                <input
-                  type="text"
-                  name="subject"
-                  id="subject"
-                  required
-                  placeholder="Judul pesan Anda"
-                  class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                />
+                <label for="subject" class={labelClass}>Subjek</label>
+                <input type="text" name="subject" id="subject" required minlength="5" placeholder="Judul pesan Anda" class={fieldClass} />
               </div>
 
               <div class="space-y-2">
-                <label for="message" class="block text-sm font-bold text-slate-700 uppercase tracking-wider">Pesan</label>
-                <textarea
-                  name="message"
-                  id="message"
-                  rows="5"
-                  required
-                  placeholder="Tuliskan pesan Anda di sini..."
-                  class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none resize-none"
-                ></textarea>
+                <label for="message" class={labelClass}>Pesan</label>
+                <textarea name="message" id="message" rows="6" required minlength="10" placeholder="Tuliskan pesan Anda di sini..." class={`${fieldClass} resize-none`}></textarea>
               </div>
 
-              <button
-                type="submit"
-                class="w-full md:w-auto px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 active:scale-95"
-              >
-                Kirim Pesan
-              </button>
+              <div class="flex flex-col gap-4 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-8 py-4 text-xs font-black uppercase tracking-widest text-white shadow-glow transition-all hover:-translate-y-0.5 hover:bg-blue-700 active:translate-y-0 sm:w-auto">
+                  Kirim Pesan
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
+                </button>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Data hanya dipakai untuk membalas pesan</p>
+              </div>
             </form>
           </div>
         </div>

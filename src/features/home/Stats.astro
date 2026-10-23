@@ -1,80 +1,66 @@
 ---
 const stats = [
-  { 
-    label: "Kawan Bergabung", 
-    value: "130+", 
+  {
+    label: "Kawan Bergabung",
+    value: "130+",
     color: "blue",
-    icon: `<svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>`
+    icon: `<svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>`,
   },
-  { 
-    label: "Koleksi Buku", 
-    value: "70+", 
+  {
+    label: "Koleksi Buku",
+    value: "70+",
     color: "indigo",
-    icon: `<svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>`
+    icon: `<svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>`,
   },
-  { 
-    label: "Diskusi Rutin", 
-    value: "50+", 
+  {
+    label: "Diskusi Rutin",
+    value: "50+",
     color: "amber",
-    icon: `<svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>`
+    icon: `<svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>`,
   },
-  { 
-    label: "Aksi Nyata", 
-    value: "10+", 
+  {
+    label: "Aksi Nyata",
+    value: "10+",
     color: "rose",
-    icon: `<svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`
-  }
+    icon: `<svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`,
+  },
 ];
 
 const colorIcons = {
-  blue: "text-blue-600 bg-blue-50",
-  indigo: "text-indigo-600 bg-indigo-50",
-  amber: "text-amber-600 bg-amber-50",
-  rose: "text-rose-600 bg-rose-50"
+  blue: "bg-blue-500/10 text-blue-300",
+  indigo: "bg-indigo-500/10 text-indigo-300",
+  amber: "bg-amber-500/10 text-amber-300",
+  rose: "bg-rose-500/10 text-rose-300",
 };
 ---
 
-<section class="py-12 md:py-16 mt-0 lg:-mt-20 relative z-20">
-  <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-    
-    {/* The Connected Pill Bar */}
-    <div class="bg-white border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.06)] rounded-3xl md:rounded-full p-1.5 md:p-3 backdrop-blur-sm">
-      <div class="grid grid-cols-2 md:grid-cols-4 items-center">
-        {stats.map((item, index) => (
-          <div class={`relative px-2 sm:px-6 py-5 md:py-8 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-4 group cursor-default transition-all duration-300 hover:bg-slate-50/50 
-            ${index === 0 ? 'rounded-tl-2xl md:rounded-l-full' : ''} 
-            ${index === 1 ? 'rounded-tr-2xl md:rounded-none' : ''} 
-            ${index === 2 ? 'rounded-bl-2xl md:rounded-none' : ''} 
-            ${index === 3 ? 'rounded-br-2xl md:rounded-r-full lg:rounded-r-full' : ''}
-          `}>
-            
-            {/* Divider (Vertical - Desktop/Tablet) */}
-            {index !== 0 && (
-              <div class={`absolute left-0 top-1/2 -translate-y-1/2 w-px h-10 md:h-12 bg-slate-100 ${index === 2 ? 'hidden md:block' : 'block'}`}></div>
-            )}
+<section class="relative z-20 -mt-8 pb-2 md:-mt-14">
+  <div class="section-shell">
+    <div class="reveal relative overflow-hidden rounded-[2rem] bg-ink px-5 py-7 shadow-2xl shadow-slate-900/20 md:px-10 md:py-10">
+      <div class="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-blue-600/25 blur-3xl" aria-hidden="true"></div>
+      <div class="absolute -bottom-24 left-1/4 h-56 w-56 rounded-full bg-indigo-500/15 blur-3xl" aria-hidden="true"></div>
 
-            {/* Divider (Horizontal for mobile) */}
-            {(index === 2 || index === 3) && (
-              <div class="absolute top-0 left-1/2 -translate-x-1/2 h-px w-3/4 bg-slate-50 md:hidden"></div>
-            )}
-
-            {/* Icon Container */}
-            <div class={`w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 ${colorIcons[item.color as keyof typeof colorIcons]}`}>
-              <Fragment set:html={item.icon} />
-            </div>
-
-            <div class="flex flex-col items-center md:items-start text-center md:text-left">
-               <span class="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-none mb-1 group-hover:text-blue-600 transition-colors">
-                 {item.value}
-               </span>
-               <span class="text-[8px] md:text-[9px] lg:text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-slate-600 transition-colors">
-                 {item.label}
-               </span>
-            </div>
+      <div class="relative">
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3 md:mb-8">
+          <div class="eyebrow border-white/10 bg-white/5 text-white/70">
+            <span class="h-1.5 w-1.5 rounded-full bg-blue-400" aria-hidden="true"></span>
+            Komunitas dalam angka
           </div>
-        ))}
+          <p class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Brebes · Sejak Juni 2025</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 lg:grid-cols-4">
+          {stats.map((item) => (
+            <div class="group bg-ink p-5 transition-colors duration-300 hover:bg-white/[0.04] md:p-7">
+              <div class={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:rotate-3 md:h-12 md:w-12 ${colorIcons[item.color as keyof typeof colorIcons]}`}>
+                <Fragment set:html={item.icon} />
+              </div>
+              <p class="text-3xl font-black leading-none tracking-tight text-white md:text-4xl">{item.value}</p>
+              <p class="mt-2 text-[9px] font-bold uppercase tracking-widest text-slate-400 md:text-[10px]">{item.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
-
   </div>
 </section>

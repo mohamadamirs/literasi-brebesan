@@ -11,8 +11,34 @@
 }
 
 @theme {
+  --color-ink: #0b1220;
+  --color-paper: #f8fafc;
+  --color-brand: #2563eb;
+  --color-accent: #f59e0b;
+  --shadow-lift: 0 24px 60px -24px rgb(15 23 42 / 0.28);
+  --shadow-glow: 0 20px 60px -20px rgb(37 99 235 / 0.45);
+  --radius-card: 2rem;
+
   --animate-pulse-slow: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-rotate-border: rotate-border 4s linear infinite;
+  --animate-mesh-shift: mesh-shift 18s ease-in-out infinite alternate;
+  --animate-float-soft: float-soft 7s ease-in-out infinite;
+  --animate-marquee: marquee 24s linear infinite;
+
+  @keyframes mesh-shift {
+    0% { transform: translate3d(-2%, -1%, 0) scale(1); }
+    100% { transform: translate3d(3%, 2%, 0) scale(1.08); }
+  }
+
+  @keyframes float-soft {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
 
   @keyframes pulse-slow {
     0%, 100% {
@@ -76,6 +102,94 @@
 .rotating-border-active > *, .solid-border-active > * {
   position: relative;
   z-index: 2;
+}
+
+@layer utilities {
+  .section-shell {
+    @apply mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-widest md:px-4 md:py-2 md:text-xs;
+  }
+
+  .display-title {
+    font-size: clamp(2.35rem, 6vw, 4.75rem);
+    font-weight: 900;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+
+  .glass-panel {
+    @apply border border-white/60 bg-white/75 backdrop-blur-xl;
+  }
+
+  .mesh-bg {
+    position: absolute;
+    inset: -20%;
+    background:
+      radial-gradient(circle at 18% 22%, rgb(37 99 235 / 0.18), transparent 42%),
+      radial-gradient(circle at 82% 18%, rgb(99 102 241 / 0.16), transparent 40%),
+      radial-gradient(circle at 62% 82%, rgb(245 158 11 / 0.14), transparent 45%);
+    filter: blur(20px);
+    animation: var(--animate-mesh-shift);
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgb(15 23 42 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(15 23 42 / 0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+  }
+
+  .reveal {
+    opacity: 1;
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: reveal-up 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-timeline: view();
+    animation-range: entry 5% cover 28%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .mesh-bg {
+    animation: none !important;
+  }
 }
 
 @layer base {
